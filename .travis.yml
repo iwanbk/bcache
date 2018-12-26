@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - 1.11.x
+
+install:
+  - go get -v -t
+
+script:
+  - go build
+  - go test -v -cover
+
+#after_success:
+#  - bash <(curl -s https://codecov.io/bash)
