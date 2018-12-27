@@ -13,13 +13,17 @@ var (
 )
 
 const (
+	// weaveworks/mesh channel name
 	channel = "bcache"
 )
 
+// Bcache represents bcache struct
 type Bcache struct {
-	peer *peer
+	peer   *peer
+	router *mesh.Router
 }
 
+// Config represents bcache configuration
 type Config struct {
 	// PeerID is unique peer ID
 	PeerID uint64
@@ -32,7 +36,6 @@ type Config struct {
 	Peers []string
 
 	// MaxKeys defines max number of keys in this cache
-	// TODO: implement it
 	MaxKeys int
 
 	Logger Logger
@@ -44,6 +47,8 @@ func (c Config) validate() error {
 	}
 	return nil
 }
+
+// New creates new bcache object
 func New(cfg Config) (*Bcache, error) {
 	const (
 		connLimit = 64
@@ -105,10 +110,14 @@ func New(cfg Config) (*Bcache, error) {
 	router.ConnectionMaker.InitiateConnections(cfg.Peers, true)
 
 	return &Bcache{
-		peer: peer,
+		peer:   peer,
+		router: router,
 	}, nil
 }
 
+func (b *Bcache) Close() error {
+	return b.router.Stop()
+}
 func (b *Bcache) Set(key, val interface{}) {
 	b.peer.Set(key, val)
 }

@@ -9,12 +9,16 @@ type entry struct {
 	Val interface{}
 }
 
-func (e *entry) encode() ([]byte, error) {
+type entries struct {
+	Entries []entry
+}
+
+func (e *entries) encode() ([]byte, error) {
 	return json.Marshal(e)
 }
 
-func newEntryFromBuf(b []byte) (*entry, error) {
-	var e entry
+func newEntryFromBuf(b []byte) (*entries, error) {
+	var e entries
 	err := json.Unmarshal(b, &e)
 	return &e, err
 }

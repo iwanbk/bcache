@@ -64,6 +64,10 @@ func (p *peer) OnGossip(msg []byte) (delta mesh.GossipData, err error) {
 // representation of the received data (typically a delta) for further
 // propagation.
 func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mesh.GossipData, err error) {
+	if src == p.name {
+		log.Printf("FROM ME DUDE")
+		return nil, nil
+	}
 	e, err := newEntryFromBuf(update)
 	if err != nil {
 		return nil, err
@@ -73,7 +77,7 @@ func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mes
 	if received == nil {
 		log.Printf("[%v]OnGossipBroadcast(nil) %v => delta %v", p.name, e, received)
 	} else {
-		log.Printf("[%v]OnGossipBroadcast %v => delta %v", p.name, e, received.(*cache).cc)
+		log.Printf("[%v] from %v OnGossipBroadcast %v => delta %v", p.name, src, e, received.(*cache).cc)
 	}
 	return
 
