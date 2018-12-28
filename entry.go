@@ -1,7 +1,7 @@
 package bcache
 
 import (
-	"encoding/json"
+	"github.com/iwanbk/bcache/json"
 )
 
 type entry struct {
@@ -19,6 +19,5 @@ func (e *entries) encode() ([]byte, error) {
 
 func newEntryFromBuf(b []byte) (*entries, error) {
 	var e entries
-	err := json.Unmarshal(b, &e)
-	return &e, err
+	return &e, json.Unmarshal(b, &e)
 }
