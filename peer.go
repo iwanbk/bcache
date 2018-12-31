@@ -87,12 +87,12 @@ func (p *peer) OnGossipUnicast(src mesh.PeerName, msg []byte) error {
 }
 
 // Increment the counter by one.
-func (p *peer) Set(key, val interface{}) {
+func (p *peer) Set(key, val string, expiredTimestamp int64) {
 	c := make(chan struct{})
 
 	p.actionCh <- func() {
 		defer close(c)
-		e := p.cc.Set(key, val)
+		e := p.cc.Set(key, val, expiredTimestamp)
 		if p.send != nil {
 			p.send.GossipBroadcast(e)
 		} else {
@@ -103,8 +103,8 @@ func (p *peer) Set(key, val interface{}) {
 	<-c // wait for it to be finished
 }
 
-func (p *peer) Get(key interface{}) (interface{}, bool) {
-	return p.cc.cc.Get(key)
+func (p *peer) Get(key string) (interface{}, bool) {
+	return p.cc.Get(key)
 }
 
 func (p *peer) loop() {

@@ -1,6 +1,7 @@
 package bcache
 
-// Logger defines interface must be implemented by the logger
+// Logger defines interface that must be implemented by
+// the logger of bcache
 type Logger interface {
 	Errorf(format string, v ...interface{})
 	Printf(format string, v ...interface{})
