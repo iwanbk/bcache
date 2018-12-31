@@ -21,7 +21,7 @@ type Bcache struct {
 
 // Config represents bcache configuration
 type Config struct {
-	// PeerID is unique peer ID
+	// PeerID is unique ID of this bcache
 	PeerID uint64
 
 	// ListenAddr is listen addr of this bcache peer.
@@ -41,7 +41,7 @@ type Config struct {
 	Logger Logger
 }
 
-// New creates new bcache object
+// New creates new bcache from the given config
 func New(cfg Config) (*Bcache, error) {
 	const (
 		connLimit = 64 // mesh router connection limit
@@ -53,6 +53,7 @@ func New(cfg Config) (*Bcache, error) {
 		logger   = cfg.Logger
 	)
 
+	// if logger is nil, create default nopLogger
 	if logger == nil {
 		logger = &nopLogger{}
 	}
@@ -108,13 +109,16 @@ func New(cfg Config) (*Bcache, error) {
 	}, nil
 }
 
-// Set sets value for the given key
-func (b *Bcache) Set(key, val interface{}) {
-	b.peer.Set(key, val)
+// Set sets value for the given key.
+//
+// expiredTimestamp is unix timestamp when this key will be expired.
+// if expiredTimestamp <= 0, the key will never expired
+func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
+	b.peer.Set(key, val, expiredTimestamp)
 }
 
 // Get gets value for the given key
-func (b *Bcache) Get(key interface{}) (interface{}, bool) {
+func (b *Bcache) Get(key string) (interface{}, bool) {
 	return b.peer.Get(key)
 }
 

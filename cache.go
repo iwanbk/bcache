@@ -3,14 +3,16 @@ package bcache
 import (
 	"log"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/golang-lru"
 	"github.com/weaveworks/mesh"
 )
 
 type cache struct {
-	mux sync.RWMutex
-	cc  *lru.Cache
+	peerID mesh.PeerName
+	mux    sync.RWMutex
+	cc     *lru.Cache
 }
 
 func newCache(maxKeys int) (*cache, error) {
@@ -29,65 +31,92 @@ func newLRU(maxKeys int) (*lru.Cache, error) {
 }
 
 // TODO: optimize it:
-// - use fastest encoder
 // - use goroutines to do the encoding
 func (c *cache) Encode() [][]byte {
 	c.mux.RLock()
 	keys := c.cc.Keys()
 	c.mux.RUnlock()
 
-	// TODO :alloc it with exact length
-	var result [][]byte
-	var es []entry
+	var (
+		result [][]byte
+		msg    = newMessage(c.peerID, 0)
+	)
 
-	for i, key := range keys {
-		val, ok := c.cc.Get(key)
+	// func to encode message and add it to the [][]byte result
+	encodeMsg := func() {
+		b, err := msg.encode()
+		if err != nil {
+			log.Printf("failed to encode cache(%v)", err)
+		} else {
+			result = append(result, b)
+		}
+
+	}
+
+	// iterate all the keys
+	for _, k := range keys {
+		key := k.(string)
+
+		val, expired, ok := getCache(c.cc, key)
 		if !ok {
 			continue
 		}
-		es = append(es, entry{
-			Key: key,
-			Val: val,
-		})
 
-		if i%5 != 0 {
+		msg.add(key, val, expired)
+
+		if !msg.fullCap() {
 			continue
 		}
-
-		b := c.encodeEntries(es)
-		if b != nil {
-			result = append(result, b)
-		}
-
-		// reset message buffer
-		es = []entry{}
+		encodeMsg()
+		msg = newMessage(c.peerID, 0)
 	}
 
-	if len(es) > 0 {
-		b := c.encodeEntries(es)
-		if b != nil {
-			result = append(result, b)
-		}
+	if !msg.empty() {
+		encodeMsg()
 	}
 	return result
 }
 
-func (c *cache) encodeEntries(es []entry) []byte {
-	msg := message{
-		Entries: es,
-	}
-	b, err := msg.encode()
-	if err != nil {
-		log.Printf("failed to encode cache(%v)", err)
-		return nil
-	}
-	return b
+// value represent cache value
+type value struct {
+	value   string
+	expired int64
 }
-func (c *cache) Set(key, val interface{}) *cache {
-	c.cc.Add(key, val)
+
+func (c *cache) Set(key, val string, expiredTimestamp int64) *cache {
+	setCache(c.cc, key, val, expiredTimestamp)
 	return &cache{
 		cc: c.cc,
 	}
+}
+
+func setCache(cc *lru.Cache, key, val string, expired int64) {
+	cc.Add(key, value{
+		value:   val,
+		expired: expired,
+	})
+}
+
+func (c *cache) Get(key string) (string, bool) {
+	val, _, ok := getCache(c.cc, key)
+	return val, ok
+}
+
+func getCache(cc *lru.Cache, key string) (string, int64, bool) {
+	cacheVal, ok := cc.Get(key)
+	if !ok {
+		return "", 0, false
+	}
+	val := cacheVal.(value)
+
+	// check for expiration
+	if val.expired > 0 && time.Now().Unix() > val.expired {
+		cc.Remove(key)
+		return "", 0, false
+	}
+
+	return val.value, val.expired, true
+
 }
 
 func (c *cache) Merge(other mesh.GossipData) (complete mesh.GossipData) {
@@ -100,13 +129,14 @@ func (c *cache) mergeComplete(cc *lru.Cache) (complete mesh.GossipData) {
 
 	keys := c.cc.Keys()
 
-	for _, key := range keys {
-		val, ok := c.cc.Get(key)
+	for _, k := range keys {
+		key := k.(string)
+		val, expired, ok := getCache(c.cc, key)
 		if !ok {
 			log.Printf("[error]mergeComplete no val for key: %v", key)
 			continue
 		}
-		c.cc.Add(key, val)
+		setCache(c.cc, key, val, expired)
 	}
 	complete = &cache{
 		cc: c.cc,
@@ -127,6 +157,7 @@ func (c *cache) mergeDelta(msg *message) (delta mesh.GossipData) {
 	}
 	return delta
 }
+
 func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
@@ -134,11 +165,13 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 	var (
 		lenEntries = len(msg.Entries)
 	)
+
 	if lenEntries == 0 {
 		return
 	}
 
-	cc, err := newLRU(lenEntries)
+	// create copied cache to send
+	copyCache, err := newLRU(lenEntries)
 	if err != nil {
 		log.Printf("[mergeDelta][error] create lru cache: %v", err)
 		return
@@ -149,13 +182,13 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 		if ok && val == e.Val {
 			continue
 		}
-		c.cc.Add(e.Key, e.Val)
-		cc.Add(e.Key, e.Val)
+		setCache(c.cc, e.Key, e.Val, e.Expired)
+		setCache(copyCache, e.Key, e.Val, e.Expired)
 
 		changedKey++
 	}
 	return &cache{
-		cc: cc,
+		cc: copyCache,
 	}, changedKey
 }
 func (c *cache) copy() *cache {

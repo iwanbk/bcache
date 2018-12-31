@@ -39,7 +39,7 @@ func TestSimple(t *testing.T) {
 	defer b2.Close()
 
 	// set from b1, and wait in b2
-	b1.Set(key1, val1)
+	b1.Set(key1, val1, 0)
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
@@ -50,7 +50,7 @@ func TestSimple(t *testing.T) {
 
 	// set from b2, and wait in b1
 
-	b2.Set(key2, val2)
+	b2.Set(key2, val2, 0)
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
@@ -88,7 +88,7 @@ func TestJoinLater(t *testing.T) {
 
 	// set values
 	for k, v := range keyvals {
-		b1.Set(k, v)
+		b1.Set(k, v, 0)
 	}
 
 	b2, err := New(Config{
