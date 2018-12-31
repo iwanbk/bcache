@@ -1,8 +1,6 @@
 package bcache
 
 import (
-	"log"
-
 	"github.com/weaveworks/mesh"
 )
 
@@ -12,9 +10,10 @@ type peer struct {
 	send     mesh.Gossip
 	actionCh chan func()
 	quitCh   chan struct{}
+	logger   Logger
 }
 
-func newPeer(name mesh.PeerName, maxKeys int) (*peer, error) {
+func newPeer(name mesh.PeerName, maxKeys int, logger Logger) (*peer, error) {
 	cc, err := newCache(maxKeys)
 	if err != nil {
 		return nil, err
@@ -26,6 +25,7 @@ func newPeer(name mesh.PeerName, maxKeys int) (*peer, error) {
 		send:     nil, // must be registered
 		actionCh: make(chan func()),
 		quitCh:   make(chan struct{}),
+		logger:   logger,
 	}
 	go p.loop()
 	return p, nil
@@ -44,17 +44,17 @@ func (p *peer) Gossip() mesh.GossipData {
 
 // OnGossip merges received data into state and returns "everything new
 // I've just learnt", or nil if nothing in the received data was new.
-func (p *peer) OnGossip(msg []byte) (delta mesh.GossipData, err error) {
-	e, err := newEntryFromBuf(msg)
+func (p *peer) OnGossip(buf []byte) (delta mesh.GossipData, err error) {
+	msg, err := newMessageFromBuf(buf)
 	if err != nil {
 		return nil, err
 	}
 
-	delta = p.cc.mergeDelta(e)
+	delta = p.cc.mergeDelta(msg)
 	if delta == nil {
-		log.Printf("[%v]OnGossip %v => delta %v", p.name, e, delta)
+		p.logger.Printf("[%v]OnGossip %v => delta %v", p.name, msg, delta)
 	} else {
-		log.Printf("[%v]OnGossip %v => delta %v", p.name, e, delta.(*cache).cc)
+		p.logger.Printf("[%v]OnGossip %v => delta %v", p.name, msg, delta.(*cache).cc)
 	}
 	return delta, nil
 
@@ -64,44 +64,49 @@ func (p *peer) OnGossip(msg []byte) (delta mesh.GossipData, err error) {
 // representation of the received data (typically a delta) for further
 // propagation.
 func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mesh.GossipData, err error) {
-	e, err := newEntryFromBuf(update)
+	if src == p.name { // message from ourself, is it possible?
+		return nil, nil
+	}
+	msg, err := newMessageFromBuf(update)
 	if err != nil {
 		return nil, err
 	}
 
-	received = p.cc.mergeReceived(e)
+	received = p.cc.mergeReceived(msg)
 	if received == nil {
-		log.Printf("[%v]OnGossipBroadcast(nil) %v => delta %v", p.name, e, received)
+		p.logger.Printf("[%v]OnGossipBroadcast(nil) %v => delta %v", p.name, msg, received)
 	} else {
-		log.Printf("[%v]OnGossipBroadcast %v => delta %v", p.name, e, received.(*cache).cc)
+		p.logger.Printf("[%v] from %v OnGossipBroadcast %v => delta %v", p.name, src, msg, received.(*cache).cc)
 	}
 	return
 
 }
 func (p *peer) OnGossipUnicast(src mesh.PeerName, msg []byte) error {
-	log.Printf("[error]OnGossipUnicast unexpected call")
+	p.logger.Printf("[error]OnGossipUnicast unexpected call")
 	return nil
 }
 
 // Increment the counter by one.
 func (p *peer) Set(key, val interface{}) {
 	c := make(chan struct{})
+
 	p.actionCh <- func() {
 		defer close(c)
 		e := p.cc.Set(key, val)
 		if p.send != nil {
 			p.send.GossipBroadcast(e)
 		} else {
-			log.Printf("no sender configured; not broadcasting update right now")
+			p.logger.Printf("no sender configured; not broadcasting update right now")
 		}
 	}
-	<-c
-	return
+
+	<-c // wait for it to be finished
 }
 
 func (p *peer) Get(key interface{}) (interface{}, bool) {
 	return p.cc.cc.Get(key)
 }
+
 func (p *peer) loop() {
 	for {
 		select {
@@ -111,5 +116,4 @@ func (p *peer) loop() {
 			return
 		}
 	}
-	log.Printf("peer[%v] loop finished", p.name)
 }

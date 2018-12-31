@@ -1,6 +1,7 @@
 package bcache
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestA(t *testing.T) {
+// Two nodes
+// peer 2 could read what peer 1 write
+func TestSimple(t *testing.T) {
 	const (
 		key1 = "key1"
 		val1 = "val1"
@@ -23,6 +26,7 @@ func TestA(t *testing.T) {
 		Logger:     logrus.New(),
 	})
 	require.NoError(t, err)
+	defer b1.Close()
 
 	b2, err := New(Config{
 		PeerID:     2,
@@ -32,6 +36,7 @@ func TestA(t *testing.T) {
 		Logger:     logrus.New(),
 	})
 	require.NoError(t, err)
+	defer b2.Close()
 
 	// set from b1, and wait in b2
 	b1.Set(key1, val1)
@@ -54,4 +59,55 @@ func TestA(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, val2, get)
 
+}
+
+// Second peer join after first peer set the keys
+func TestJoinLater(t *testing.T) {
+	const (
+		numKeys = 15
+	)
+	var (
+		keyvals = make(map[string]string)
+	)
+	for i := 0; i < numKeys; i++ {
+		k := fmt.Sprintf("key_%d", i)
+		v := fmt.Sprintf("val_%d", i)
+		keyvals[k] = v
+	}
+
+	// create first node
+	b1, err := New(Config{
+		PeerID:     1,
+		ListenAddr: "127.0.0.1:12347",
+		Peers:      nil,
+		MaxKeys:    1000,
+		Logger:     logrus.New(),
+	})
+	require.NoError(t, err)
+	defer b1.Close()
+
+	// set values
+	for k, v := range keyvals {
+		b1.Set(k, v)
+	}
+
+	b2, err := New(Config{
+		PeerID:     2,
+		ListenAddr: "127.0.0.1:12348",
+		Peers:      []string{"127.0.0.1:12347"},
+		MaxKeys:    1000,
+		Logger:     logrus.New(),
+	})
+	require.NoError(t, err)
+	defer b2.Close()
+
+	// wait for it to propagate
+	time.Sleep(2 * time.Second)
+
+	// check we could get it from b2
+	for k, v := range keyvals {
+		got, ok := b2.Get(k)
+		require.True(t, ok)
+		require.Equal(t, v, got)
+	}
 }
