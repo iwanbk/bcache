@@ -1,25 +1,25 @@
 package bcache
 
 import (
-	"errors"
 	"net"
 	"strconv"
 
 	"github.com/weaveworks/mesh"
 )
 
-var (
-	ErrNilLogger = errors.New("nil logger")
-)
-
 const (
+	// weaveworks/mesh channel name
 	channel = "bcache"
 )
 
+// Bcache represents bcache struct
 type Bcache struct {
-	peer *peer
+	peer   *peer
+	router *mesh.Router
+	logger Logger
 }
 
+// Config represents bcache configuration
 type Config struct {
 	// PeerID is unique peer ID
 	PeerID uint64
@@ -28,32 +28,34 @@ type Config struct {
 	// used to communicate with other peers
 	ListenAddr string
 
-	// Peers is the address of the known peers
+	// Peers is the address of the known peers.
+	// we don't need to know all of the other peers,
+	// gossip protocol will find the other peers
 	Peers []string
 
 	// MaxKeys defines max number of keys in this cache
-	// TODO: implement it
 	MaxKeys int
 
+	// Logger to be used
+	// leave it nil to use default logger which do nothing
 	Logger Logger
 }
 
-func (c Config) validate() error {
-	if c.Logger == nil {
-		return ErrNilLogger
-	}
-	return nil
-}
+// New creates new bcache object
 func New(cfg Config) (*Bcache, error) {
 	const (
-		connLimit = 64
+		connLimit = 64 // mesh router connection limit
 	)
 
 	var (
 		peerName = mesh.PeerName(cfg.PeerID)
 		nickName = cfg.ListenAddr
-		log      = cfg.Logger
+		logger   = cfg.Logger
 	)
+
+	if logger == nil {
+		logger = &nopLogger{}
+	}
 
 	// parse host port
 	host, portStr, err := net.SplitHostPort(cfg.ListenAddr)
@@ -73,13 +75,13 @@ func New(cfg Config) (*Bcache, error) {
 		ConnLimit:          connLimit,
 		PeerDiscovery:      true,
 		TrustedSubnets:     []*net.IPNet{},
-	}, peerName, nickName, mesh.NullOverlay{}, log)
+	}, peerName, nickName, mesh.NullOverlay{}, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	// bcache peer
-	peer, err := newPeer(peerName, cfg.MaxKeys)
+	peer, err := newPeer(peerName, cfg.MaxKeys, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -93,25 +95,31 @@ func New(cfg Config) (*Bcache, error) {
 	peer.register(gossip)
 
 	// start mesh router
-	log.Printf("mesh router starting at %s", cfg.ListenAddr)
+	logger.Printf("mesh router starting at %s", cfg.ListenAddr)
 	router.Start()
-
-	defer func() {
-		log.Printf("mesh router stopping")
-		router.Stop()
-	}()
 
 	// creates new connection to the provided peers
 	router.ConnectionMaker.InitiateConnections(cfg.Peers, true)
 
 	return &Bcache{
-		peer: peer,
+		peer:   peer,
+		router: router,
+		logger: logger,
 	}, nil
 }
 
+// Set sets value for the given key
 func (b *Bcache) Set(key, val interface{}) {
 	b.peer.Set(key, val)
 }
+
+// Get gets value for the given key
 func (b *Bcache) Get(key interface{}) (interface{}, bool) {
 	return b.peer.Get(key)
+}
+
+// Close closes the cache, free all the resource
+func (b *Bcache) Close() error {
+	b.logger.Printf("mesh router stopping")
+	return b.router.Stop()
 }
