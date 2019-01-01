@@ -118,7 +118,7 @@ func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
 }
 
 // Get gets value for the given key
-func (b *Bcache) Get(key string) (interface{}, bool) {
+func (b *Bcache) Get(key string) (string, bool) {
 	return b.peer.Get(key)
 }
 
