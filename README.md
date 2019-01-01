@@ -11,15 +11,16 @@ It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for dat
 
 ## Features
 
-- LRU cache
+- LRU cache with configurable maximum keys
 - Eventual Consistency synchronization between peers
 - Data are replicated to all peers
 - cache filling mechanism (TODO)
 
 ## Why using it
 
-- if extra network hops needed by `redis` or `memcached` is not acceptable for you
+- if extra network hops needed by external caches like `redis` or `memcached` is not acceptable for you
 - you only need cache with simple `Set` & `Get` operation
+- you have enough RAM to hold the cache data
 
 ## Quick Start
 
