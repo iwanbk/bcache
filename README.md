@@ -14,13 +14,18 @@ It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for dat
 - LRU cache with configurable maximum keys
 - Eventual Consistency synchronization between peers
 - Data are replicated to all peers
-- cache filling mechanism (TODO)
+- cache filling mechanism. When the cache of the given key is not exist, bcache coordinates cache fills such that only one call populates the cache to avoid thundering herd or [cache stampede](https://en.wikipedia.org/wiki/Cache_stampede)
 
 ## Why using it
 
 - if extra network hops needed by external caches like `redis` or `memcached` is not acceptable for you
 - you only need cache with simple `Set` & `Get` operation
 - you have enough RAM to hold the cache data
+
+## Credits
+
+- [weaveworks/mesh](https://github.com/weaveworks/mesh) for the gossip library
+- [groupcache](https://github.com/golang/groupcache) for the inspiration
 
 ## Quick Start
 
@@ -69,3 +74,23 @@ if err != nil {
 val, exists := bc.Get("my_key2")
 ```
 
+### Cache filling 
+
+```
+c, err := New(Config{
+	PeerID:     3,
+	ListenAddr: "192.168.0.3:12345",
+	Peers:      []string{"192.168.0.1:12345"},
+	MaxKeys:    1000,
+	Logger:     logrus.New(),
+})
+if err != nil {
+    log.Fatalf("failed to create cache: %v", err)
+}
+val, exists,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
+                // get value from database
+                 .....
+                //
+				return value, 0, nil
+			})
+```

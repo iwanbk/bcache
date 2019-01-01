@@ -1,6 +1,7 @@
 package bcache
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -109,5 +110,64 @@ func TestJoinLater(t *testing.T) {
 		got, ok := b2.Get(k)
 		require.True(t, ok)
 		require.Equal(t, v, got)
+	}
+}
+
+func TestFiller(t *testing.T) {
+	var (
+		errFillerFailed = errors.New("filler failed")
+	)
+
+	testCases := []struct {
+		name   string
+		filler Filler
+		err    error
+		key    string
+		ok     bool
+	}{
+		{
+			name:   "nil filler",
+			filler: nil,
+			err:    ErrNilFiller,
+			key:    "nil",
+		},
+		{
+			name: "valid filler",
+			filler: func(key string) (string, int64, error) {
+				return key, 0, nil
+			},
+			key: "valid",
+			err: nil,
+			ok:  true,
+		},
+		{
+			name: "failed filler",
+			filler: func(key string) (string, int64, error) {
+				return "", 0, errFillerFailed
+			},
+			key: "failed",
+			err: errFillerFailed,
+		},
+	}
+
+	bc, err := New(Config{
+		PeerID:     2,
+		ListenAddr: "127.0.0.1:12349",
+		MaxKeys:    1000,
+		Logger:     logrus.New(),
+	})
+	require.NoError(t, err)
+	defer bc.Close()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			val, ok, err := bc.GetWithFiller(tc.key, tc.filler)
+			require.Equal(t, tc.err, err)
+			if tc.err != nil {
+				return
+			}
+			require.Equal(t, tc.key, val)
+			require.Equal(t, tc.ok, ok)
+		})
 	}
 }
