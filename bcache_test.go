@@ -110,3 +110,32 @@ func TestJoinLater(t *testing.T) {
 		require.Equal(t, v, got)
 	}
 }
+
+func TestValidationError(t *testing.T) {
+	// invalid address because no port
+	c := Config{
+		PeerID:     1,
+		ListenAddr: "127.0.0.1",
+		Peers:      nil,
+		MaxKeys:    1000,
+		Logger:     logrus.New(),
+	}
+
+	_, err := New(c)
+	require.Error(t, err)
+
+	// invalid address because wrong port
+	c.ListenAddr = "127.0.0.1:abcd"
+	_, err = New(c)
+	require.Error(t, err)
+
+	// null logger not cause error
+	c.Logger = nil
+	c.ListenAddr = "127.0.0.1:12666"
+
+	b1, err := New(c)
+	require.NoError(t, err)
+	require.NotNil(t, b1)
+	defer b1.Close()
+
+}
