@@ -5,6 +5,7 @@ import "github.com/weaveworks/mesh"
 // Config represents bcache configuration
 type Config struct {
 	// PeerID is unique ID of this bcache
+	// if PeerID = 0, it will be set using mac address
 	PeerID uint64
 
 	// ListenAddr is listen addr of this bcache peer.
@@ -24,20 +25,19 @@ type Config struct {
 	Logger Logger
 }
 
-func (c *Config) setPeer() (mesh.PeerName, error) {
-	if c.PeerID != uint64(0) {
-		return mesh.PeerName(c.PeerID), nil
-	}
+func (c *Config) setDefault() error {
+	if c.PeerID == uint64(0) {
+		mac, err := getMacAddress()
+		if err != nil {
+			return err
+		}
 
-	mac, err := getMacAddress()
-	if err != nil {
-		return mesh.PeerName(0), err
-	}
+		pName, err := mesh.PeerNameFromString(mac)
+		if err != nil {
+			return err
+		}
 
-	pName, err := mesh.PeerNameFromString(mac)
-	if err != nil {
-		return mesh.PeerName(0), err
+		c.PeerID = uint64(pName)
 	}
-
-	return pName, nil
+	return nil
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"github.com/weaveworks/mesh"
 )
 
 func TestConfig(t *testing.T) {
@@ -17,9 +16,9 @@ func TestConfig(t *testing.T) {
 		Logger:     logrus.New(),
 	}
 
-	p, err := c.setPeer()
+	err := c.setDefault()
 	require.NoError(t, err)
-	require.NotEqual(t, mesh.PeerName(uint64(0)), p)
+	require.NotEqual(t, uint64(0), c.PeerID)
 
 	// should be using predefined id
 	cfgManual := Config{
@@ -30,7 +29,7 @@ func TestConfig(t *testing.T) {
 		PeerID:     uint64(2),
 	}
 
-	pMan, err := cfgManual.setPeer()
+	err = cfgManual.setDefault()
 	require.NoError(t, err)
-	require.Equal(t, mesh.PeerName(uint64(2)), pMan)
+	require.Equal(t, uint64(2), cfgManual.PeerID)
 }

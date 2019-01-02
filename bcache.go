@@ -27,15 +27,16 @@ func New(cfg Config) (*Bcache, error) {
 
 	var (
 		peerName mesh.PeerName
-		err      error
 		nickName = cfg.ListenAddr
 		logger   = cfg.Logger
 	)
 
-	peerName, err = cfg.setPeer()
-	if err != nil {
+	if err := cfg.setDefault(); err != nil {
 		return nil, err
 	}
+
+	// set peer name
+	peerName = mesh.PeerName(cfg.PeerID)
 
 	// if logger is nil, create default nopLogger
 	if logger == nil {
