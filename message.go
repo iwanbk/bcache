@@ -1,8 +1,6 @@
 package bcache
 
 import (
-	"encoding/json"
-
 	"github.com/weaveworks/mesh"
 )
 
@@ -38,7 +36,7 @@ func newMessage(peerID mesh.PeerName, numEntries int) *message {
 
 func newMessageFromBuf(b []byte) (*message, error) {
 	var m message
-	err := json.Unmarshal(b, &m)
+	err := unmarshal(b, &m)
 	return &m, err
 }
 
@@ -58,5 +56,5 @@ func (m *message) empty() bool {
 	return len(m.Entries) == 0
 }
 func (m *message) encode() ([]byte, error) {
-	return json.Marshal(m)
+	return marshal(m)
 }
