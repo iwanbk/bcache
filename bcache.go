@@ -48,10 +48,26 @@ func New(cfg Config) (*Bcache, error) {
 	)
 
 	var (
-		peerName = mesh.PeerName(cfg.PeerID)
+		peerName mesh.PeerName
 		nickName = cfg.ListenAddr
 		logger   = cfg.Logger
 	)
+
+	if cfg.PeerID == uint64(0) {
+		mac, err := getMacAddress()
+		if err != nil {
+			return nil, err
+		}
+
+		pName, err := mesh.PeerNameFromString(mac)
+		if err != nil {
+			return nil, err
+		}
+
+		peerName = pName
+	} else {
+		peerName = mesh.PeerName(cfg.PeerID)
+	}
 
 	// if logger is nil, create default nopLogger
 	if logger == nil {

@@ -19,7 +19,6 @@ func TestSimple(t *testing.T) {
 		val2 = "val2"
 	)
 	b1, err := New(Config{
-		PeerID:     1,
 		ListenAddr: "127.0.0.1:12345",
 		Peers:      nil,
 		MaxKeys:    1000,
