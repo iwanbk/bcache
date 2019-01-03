@@ -4,11 +4,10 @@ go:
   - 1.11.x
 
 install:
-  - go get -v -t
+  - make install
 
 script:
-  - go build
-  - go test -coverprofile=coverage.txt -covermode=atomic
+  - make all
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
