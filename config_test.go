@@ -8,17 +8,17 @@ import (
 )
 
 func TestConfig(t *testing.T) {
-	// should be using mac addr
+	// peer ID and logger not set, should use default value
 	c := Config{
 		ListenAddr: "127.0.0.1:12345",
 		Peers:      nil,
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
 	}
 
 	err := c.setDefault()
 	require.NoError(t, err)
-	require.NotEqual(t, uint64(0), c.PeerID)
+	require.NotEqual(t, 0, c.PeerID)
+	require.IsType(t, &nopLogger{}, c.Logger)
 
 	// should be using predefined id
 	cfgManual := Config{
@@ -32,4 +32,5 @@ func TestConfig(t *testing.T) {
 	err = cfgManual.setDefault()
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), cfgManual.PeerID)
+	require.IsType(t, &logrus.Logger{}, cfgManual.Logger)
 }
