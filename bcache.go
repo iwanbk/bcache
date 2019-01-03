@@ -1,10 +1,12 @@
 package bcache
 
 import (
+	"errors"
 	"net"
 	"strconv"
 
 	"github.com/weaveworks/mesh"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -12,11 +14,16 @@ const (
 	channel = "bcache"
 )
 
+var (
+	ErrNilFiller = errors.New("nil filler")
+)
+
 // Bcache represents bcache struct
 type Bcache struct {
 	peer   *peer
 	router *mesh.Router
 	logger Logger
+	flight singleflight.Group
 }
 
 // New creates new bcache from the given config
@@ -102,9 +109,61 @@ func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
 	b.peer.Set(key, val, expiredTimestamp)
 }
 
-// Get gets value for the given key
+// Get gets value for the given key.
+// It returns the value and true if the key exists
 func (b *Bcache) Get(key string) (string, bool) {
 	return b.peer.Get(key)
+}
+
+// Filler defines func to be called when the given key is not exists
+type Filler func(key string) (val string, expired int64, err error)
+
+// GetWithFiller gets value for the given key and fill the cache
+// if the given key is not exists
+//
+// `filler` will be used to fill(Set) the cache
+// when the given key is not exist.
+//
+// It useful to avoid thundering herd of the underlying database
+func (b *Bcache) GetWithFiller(key string, filler Filler) (string, bool, error) {
+	if filler == nil {
+		return "", false, ErrNilFiller
+	}
+
+	// get value from cache
+	val, ok := b.Get(key)
+	if ok {
+		return val, ok, nil
+	}
+
+	// construct singleflight filler
+	flightFn := func() (interface{}, error) {
+		val, expired, err := filler(key)
+		if err != nil {
+			b.logger.Errorf("filler failed: %v", err)
+			return nil, err
+		}
+
+		// set the key if filler OK
+		b.peer.Set(key, val, expired)
+
+		return value{
+			value:   val,
+			expired: expired,
+		}, nil
+	}
+
+	// call the filler
+	valueIf, err, _ := b.flight.Do(key, func() (interface{}, error) {
+		return flightFn()
+	})
+	if err != nil {
+		return "", false, err
+	}
+
+	// return the value
+	value := valueIf.(value)
+	return value.value, true, nil
 }
 
 // Close closes the cache, free all the resource
