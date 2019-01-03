@@ -32,23 +32,15 @@ func New(cfg Config) (*Bcache, error) {
 		connLimit = 64 // mesh router connection limit
 	)
 
-	var (
-		peerName mesh.PeerName
-		nickName = cfg.ListenAddr
-		logger   = cfg.Logger
-	)
-
 	if err := cfg.setDefault(); err != nil {
 		return nil, err
 	}
 
-	// set peer name
-	peerName = mesh.PeerName(cfg.PeerID)
-
-	// if logger is nil, create default nopLogger
-	if logger == nil {
-		logger = &nopLogger{}
-	}
+	var (
+		peerName = mesh.PeerName(cfg.PeerID)
+		nickName = cfg.ListenAddr
+		logger   = cfg.Logger
+	)
 
 	// parse host port
 	host, portStr, err := net.SplitHostPort(cfg.ListenAddr)
@@ -119,12 +111,15 @@ func (b *Bcache) Get(key string) (string, bool) {
 type Filler func(key string) (val string, expired int64, err error)
 
 // GetWithFiller gets value for the given key and fill the cache
-// if the given key is not exists
+// if the given key is not exists.
 //
 // `filler` will be used to fill(Set) the cache
 // when the given key is not exist.
+// Even there are many goroutines which call `GetWithFiller`, the given `Filler` func
+// will only called once for each of the key.
 //
-// It useful to avoid thundering herd of the underlying database
+//
+// It useful to avoid thundering herd or cache stampede to  the underlying database
 func (b *Bcache) GetWithFiller(key string, filler Filler) (string, bool, error) {
 	if filler == nil {
 		return "", false, ErrNilFiller

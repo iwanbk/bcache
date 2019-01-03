@@ -26,7 +26,8 @@ type Config struct {
 }
 
 func (c *Config) setDefault() error {
-	if c.PeerID == uint64(0) {
+	// if peerID == 0, get peerID based on the mac address
+	if c.PeerID == 0 {
 		mac, err := getMacAddress()
 		if err != nil {
 			return err
@@ -39,5 +40,11 @@ func (c *Config) setDefault() error {
 
 		c.PeerID = uint64(pName)
 	}
+
+	// if logger is nil, create default nopLogger
+	if c.Logger == nil {
+		c.Logger = &nopLogger{}
+	}
+
 	return nil
 }
