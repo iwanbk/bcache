@@ -19,11 +19,15 @@ func TestSimple(t *testing.T) {
 		key2 = "key2"
 		val2 = "val2"
 	)
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
 	b1, err := New(Config{
+		PeerID:     1,
 		ListenAddr: "127.0.0.1:12345",
 		Peers:      nil,
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     logger,
 	})
 	require.NoError(t, err)
 	defer b1.Close()
@@ -33,7 +37,7 @@ func TestSimple(t *testing.T) {
 		ListenAddr: "127.0.0.1:12346",
 		Peers:      []string{"127.0.0.1:12345"},
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     logger,
 	})
 	require.NoError(t, err)
 	defer b2.Close()
