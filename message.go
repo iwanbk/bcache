@@ -1,6 +1,9 @@
 package bcache
 
 import (
+	"log"
+	"sync"
+
 	"github.com/weaveworks/mesh"
 )
 
@@ -9,11 +12,11 @@ const (
 )
 
 // message defines gossip message used for communication between peers
-// TODO: use fastest encoding possible
+// TODO: use protobuf for encoding
 type message struct {
+	mux     sync.RWMutex
 	PeerID  mesh.PeerName
-	Entries []entry
-	cap     int
+	Entries map[string]entry
 }
 
 // entry is a single key value entry
@@ -27,10 +30,13 @@ func newMessage(peerID mesh.PeerName, numEntries int) *message {
 	if numEntries == 0 {
 		numEntries = defaultNumEntries
 	}
+	return newMessageFromEntries(peerID, make(map[string]entry, numEntries))
+}
+
+func newMessageFromEntries(peerID mesh.PeerName, entries map[string]entry) *message {
 	return &message{
 		PeerID:  peerID,
-		Entries: make([]entry, 0, numEntries),
-		cap:     numEntries,
+		Entries: entries,
 	}
 }
 
@@ -41,20 +47,37 @@ func newMessageFromBuf(b []byte) (*message, error) {
 }
 
 func (m *message) add(key, val string, expired int64) {
-	m.Entries = append(m.Entries, entry{
+	m.Entries[key] = entry{
 		Key:     key,
 		Val:     val,
 		Expired: expired,
-	})
+	}
 }
 
-func (m *message) fullCap() bool {
-	return len(m.Entries) >= m.cap
+// Encode implements mesh.GossipData.Encode
+// TODO: split the encoding by X number of keys
+func (m *message) Encode() [][]byte {
+	b, err := marshal(m)
+	if err != nil {
+		log.Printf("failed to encode message: %v", err)
+	}
+	return [][]byte{b}
 }
 
-func (m *message) empty() bool {
-	return len(m.Entries) == 0
+// Merge implements mesh.GossipData.Merge
+func (m *message) Merge(other mesh.GossipData) (complete mesh.GossipData) {
+	return m.mergeComplete(other.(*message))
 }
-func (m *message) encode() ([]byte, error) {
-	return marshal(m)
+
+func (m *message) mergeComplete(other *message) mesh.GossipData {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	for k, v := range other.Entries {
+		_, ok := m.Entries[k]
+		if !ok {
+			m.Entries[k] = v
+		}
+	}
+	return newMessageFromEntries(m.PeerID, m.Entries)
 }

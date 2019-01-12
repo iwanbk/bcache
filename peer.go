@@ -38,66 +38,87 @@ func (p *peer) register(send mesh.Gossip) {
 	}
 }
 
+// Gossip implements mesh.Gossiper.Gossip
 func (p *peer) Gossip() mesh.GossipData {
-	return p.cc.copy()
+	m := newMessage(p.name, p.cc.cc.Len())
+
+	for _, k := range p.cc.cc.Keys() {
+		key := k.(string)
+		val, expired, ok := p.cc.get(key)
+		if !ok {
+			continue
+		}
+		m.add(key, val, expired)
+	}
+	return m
 }
 
 // OnGossip merges received data into state and returns "everything new
 // I've just learnt", or nil if nothing in the received data was new.
+//
+// It implements mesh.Gossiper.OnGossip
 func (p *peer) OnGossip(buf []byte) (delta mesh.GossipData, err error) {
 	msg, err := newMessageFromBuf(buf)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	delta = p.cc.mergeDelta(msg)
-	if delta == nil {
-		p.logger.Printf("[%v]OnGossip %v => delta %v", p.name, msg, delta)
-	} else {
-		p.logger.Printf("[%v]OnGossip %v => delta %v", p.name, msg, delta.(*cache).cc)
-	}
-	return delta, nil
+	var deltaMsg *message
 
+	delta = p.cc.mergeNew(msg)
+	if delta != nil {
+		deltaMsg = delta.(*message)
+	}
+
+	p.logger.Debugf("[%d]OnGossip %v => delta %v", p.name, msg, deltaMsg)
+	return
 }
 
 // OnGossipBroadcast merges received data into state and returns a
 // representation of the received data (typically a delta) for further
 // propagation.
+//
+// It implements mesh.Gossiper.OnGossipBroadcast
 func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mesh.GossipData, err error) {
 	if src == p.name { // message from ourself, is it possible?
-		return nil, nil
+		return
 	}
 	msg, err := newMessageFromBuf(update)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	received = p.cc.mergeReceived(msg)
-	if received == nil {
-		p.logger.Printf("[%v]OnGossipBroadcast(nil) %v => delta %v", p.name, msg, received)
-	} else {
-		p.logger.Printf("[%v] from %v OnGossipBroadcast %v => delta %v", p.name, src, msg, received.(*cache).cc)
+	var recvMsg *message
+
+	received = p.cc.mergeDelta(msg)
+	if received != nil {
+		recvMsg = received.(*message)
 	}
+	p.logger.Debugf("[%d]OnGossipBroadcast %v => delta %v", p.name, msg, recvMsg)
 	return
 
 }
 func (p *peer) OnGossipUnicast(src mesh.PeerName, msg []byte) error {
-	p.logger.Printf("[error]OnGossipUnicast unexpected call")
+	p.logger.Errorf("[error]OnGossipUnicast unexpected call")
 	return nil
 }
 
-// Increment the counter by one.
 func (p *peer) Set(key, val string, expiredTimestamp int64) {
 	c := make(chan struct{})
 
 	p.actionCh <- func() {
 		defer close(c)
-		e := p.cc.Set(key, val, expiredTimestamp)
-		if p.send != nil {
-			p.send.GossipBroadcast(e)
-		} else {
+
+		// set our cache
+		p.cc.Set(key, val, expiredTimestamp)
+
+		if p.send == nil {
 			p.logger.Printf("no sender configured; not broadcasting update right now")
 		}
+		// construct & send the message
+		m := newMessage(p.name, 1)
+		m.add(key, val, expiredTimestamp)
+		p.send.GossipBroadcast(m)
 	}
 
 	<-c // wait for it to be finished
