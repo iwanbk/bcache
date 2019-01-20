@@ -19,6 +19,9 @@ func TestSimple(t *testing.T) {
 		key2 = "key2"
 		val2 = "val2"
 	)
+	var (
+		expiredIn = 10 * time.Minute
+	)
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
@@ -43,24 +46,26 @@ func TestSimple(t *testing.T) {
 	defer b2.Close()
 
 	// set from b1, and wait in b2
-	b1.Set(key1, val1, 0)
+	b1.Set(key1, val1, time.Now().Add(expiredIn).Unix())
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
 
-	get, ok := b2.Get(key1)
+	get, exp, ok := b2.Get(key1)
 	require.True(t, ok)
+	require.NotZero(t, exp)
 	require.Equal(t, val1, get)
 
 	// set from b2, and wait in b1
 
-	b2.Set(key2, val2, 0)
+	b2.Set(key2, val2, time.Now().Add(expiredIn).Unix())
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
 
-	get, ok = b1.Get(key2)
+	get, exp, ok = b1.Get(key2)
 	require.True(t, ok)
+	require.NotZero(t, exp)
 	require.Equal(t, val2, get)
 
 }
@@ -71,7 +76,8 @@ func TestJoinLater(t *testing.T) {
 		numKeys = 15
 	)
 	var (
-		keyvals = make(map[string]string)
+		keyvals   = make(map[string]string)
+		expiredIn = 10 * time.Minute
 	)
 	for i := 0; i < numKeys; i++ {
 		k := fmt.Sprintf("key_%d", i)
@@ -92,7 +98,7 @@ func TestJoinLater(t *testing.T) {
 
 	// set values
 	for k, v := range keyvals {
-		b1.Set(k, v, 0)
+		b1.Set(k, v, time.Now().Add(expiredIn).Unix())
 	}
 
 	b2, err := New(Config{
@@ -110,7 +116,7 @@ func TestJoinLater(t *testing.T) {
 
 	// check we could get it from b2
 	for k, v := range keyvals {
-		got, ok := b2.Get(k)
+		got, _, ok := b2.Get(k)
 		require.True(t, ok)
 		require.Equal(t, v, got)
 	}
@@ -119,6 +125,7 @@ func TestJoinLater(t *testing.T) {
 func TestFiller(t *testing.T) {
 	var (
 		errFillerFailed = errors.New("filler failed")
+		expiredIn       = 10 * time.Minute
 	)
 
 	testCases := []struct {
@@ -137,7 +144,7 @@ func TestFiller(t *testing.T) {
 		{
 			name: "valid filler",
 			filler: func(key string) (string, int64, error) {
-				return key, 0, nil
+				return key, time.Now().Add(expiredIn).Unix(), nil
 			},
 			key: "valid",
 			err: nil,
@@ -146,7 +153,7 @@ func TestFiller(t *testing.T) {
 		{
 			name: "failed filler",
 			filler: func(key string) (string, int64, error) {
-				return "", 0, errFillerFailed
+				return "", time.Now().Add(expiredIn).Unix(), errFillerFailed
 			},
 			key: "failed",
 			err: errFillerFailed,
@@ -164,13 +171,13 @@ func TestFiller(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			val, ok, err := bc.GetWithFiller(tc.key, tc.filler)
+			val, exp, err := bc.GetWithFiller(tc.key, tc.filler)
 			require.Equal(t, tc.err, err)
 			if tc.err != nil {
 				return
 			}
 			require.Equal(t, tc.key, val)
-			require.Equal(t, tc.ok, ok)
+			require.NotZero(t, exp)
 		})
 	}
 }

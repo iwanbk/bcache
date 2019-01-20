@@ -124,7 +124,7 @@ func (p *peer) Set(key, val string, expiredTimestamp int64) {
 	<-c // wait for it to be finished
 }
 
-func (p *peer) Get(key string) (string, bool) {
+func (p *peer) Get(key string) (string, int64, bool) {
 	return p.cc.Get(key)
 }
 

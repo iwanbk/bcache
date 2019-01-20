@@ -2,7 +2,7 @@ package bcache
 
 import (
 	"sync"
-	"time"
+	//"time"
 
 	"github.com/hashicorp/golang-lru"
 	"github.com/weaveworks/mesh"
@@ -51,19 +51,8 @@ func (c *cache) get(key string) (string, int64, bool) {
 }
 
 // Get gets cache value of the given key
-func (c *cache) Get(key string) (string, bool) {
-	val, expired, ok := c.get(key)
-	if !ok {
-		return "", false
-	}
-	// check for expiration
-	if expired > 0 && time.Now().Unix() > expired {
-		c.cc.Remove(key)
-		return "", false
-	}
-
-	return val, true
-
+func (c *cache) Get(key string) (string, int64, bool) {
+	return c.get(key)
 }
 
 // merges received data into state and returns a
@@ -95,8 +84,8 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 
 	var existingKeys []string
 	for _, e := range msg.Entries {
-		val, ok := c.cc.Get(e.Key)
-		if ok && val == e.Val {
+		_, exp, ok := c.get(e.Key)
+		if ok && exp < e.Expired {
 			existingKeys = append(existingKeys, e.Key)
 			continue
 		}

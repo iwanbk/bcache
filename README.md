@@ -5,15 +5,13 @@
 [![codecov](https://codecov.io/gh/iwanbk/bcache/branch/master/graph/badge.svg)](https://codecov.io/gh/iwanbk/bcache)
 [![Go Report Card](https://goreportcard.com/badge/github.com/iwanbk/bcache)](https://goreportcard.com/report/github.com/iwanbk/bcache)
 
-A Go Library to create distributed in-memory cache.
-
-It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for data synchronization between peers.
+A Go Library to create distributed in-memory cache inside your app.
 
 ## Features
 
 - LRU cache with configurable maximum keys
 - Eventual Consistency synchronization between peers
-- Data are replicated to all peers
+- Data are replicated to all nodes
 - cache filling mechanism. When the cache of the given key is not exist, bcache coordinates cache fills such that only one call populates the cache to avoid thundering herd or [cache stampede](https://en.wikipedia.org/wiki/Cache_stampede)
 
 ## Why using it
@@ -22,10 +20,25 @@ It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for dat
 - you only need cache with simple `Set` & `Get` operation
 - you have enough RAM to hold the cache data
 
-## Credits
+## How it Works
 
-- [weaveworks/mesh](https://github.com/weaveworks/mesh) for the gossip library
-- [groupcache](https://github.com/golang/groupcache) for the inspiration
+1. Nodes find each other using [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol)
+
+Only need to specify one or few nodes as bootstrap nodes, and all nodes will find each other using gossip protocol
+
+2. When there is cache `set`, the event will be propagated to all of the nodes.
+
+So, all of the nodes will have synced data.
+
+
+## Expiration
+
+Although this library doesn't invalidate the keys when it reachs the expiration time,
+the expiration timestamp will be used as a way to decide which value is the newer when doing data synchronization
+among nodes.
+
+So, it is `mandatory` to set the expiration time.
+
 
 ## Cache filling
 
@@ -104,3 +117,7 @@ if err != nil {
 val, exists := bc.Get("my_key2")
 ```
 
+## Credits
+
+- [weaveworks/mesh](https://github.com/weaveworks/mesh) for the gossip library
+- [groupcache](https://github.com/golang/groupcache) for the inspiration

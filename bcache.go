@@ -96,14 +96,13 @@ func New(cfg Config) (*Bcache, error) {
 // Set sets value for the given key.
 //
 // expiredTimestamp is unix timestamp when this key will be expired.
-// if expiredTimestamp <= 0, the key will never expired
 func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
 	b.peer.Set(key, val, expiredTimestamp)
 }
 
 // Get gets value for the given key.
-// It returns the value and true if the key exists
-func (b *Bcache) Get(key string) (string, bool) {
+// It returns the value, timestamp, and true if the key exists
+func (b *Bcache) Get(key string) (string, int64, bool) {
 	return b.peer.Get(key)
 }
 
@@ -120,15 +119,15 @@ type Filler func(key string) (val string, expired int64, err error)
 //
 //
 // It useful to avoid thundering herd or cache stampede to  the underlying database
-func (b *Bcache) GetWithFiller(key string, filler Filler) (string, bool, error) {
+func (b *Bcache) GetWithFiller(key string, filler Filler) (string, int64, error) {
 	if filler == nil {
-		return "", false, ErrNilFiller
+		return "", 0, ErrNilFiller
 	}
 
 	// get value from cache
-	val, ok := b.Get(key)
+	val, exp, ok := b.Get(key)
 	if ok {
-		return val, ok, nil
+		return val, exp, nil
 	}
 
 	// construct singleflight filler
@@ -153,12 +152,12 @@ func (b *Bcache) GetWithFiller(key string, filler Filler) (string, bool, error) 
 		return flightFn()
 	})
 	if err != nil {
-		return "", false, err
+		return "", 0, err
 	}
 
 	// return the value
 	value := valueIf.(value)
-	return value.value, true, nil
+	return value.value, value.expired, nil
 }
 
 // Close closes the cache, free all the resource
