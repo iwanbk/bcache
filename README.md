@@ -37,7 +37,7 @@ Although this library doesn't invalidate the keys when it reachs the expiration 
 the expiration timestamp will be used as a way to decide which value is the newer when doing data synchronization
 among nodes.
 
-So, it is `mandatory` to set the expiration time.
+So, it is **mandatory** to set the expiration time.
 
 
 ## Cache filling
@@ -58,12 +58,11 @@ c, err := New(Config{
 	ListenAddr: "192.168.0.3:12345",
 	Peers:      []string{"192.168.0.1:12345"},
 	MaxKeys:    1000,
-	Logger:     logrus.New(),
 })
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exists,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
+val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
         // get value from database
          .....
          //
@@ -77,14 +76,14 @@ In server 1
 bc, err := New(Config{
 	// PeerID:     1, // leave it, will be set automatically based on mac addr
 	ListenAddr: "192.168.0.1:12345",
-	Peers:      nil,
+	Peers:      nil, // it nil because we will use this node as bootstrap node
 	MaxKeys:    1000,
 	Logger:     logrus.New(),
 })
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key", "my_val")
+bc.Set("my_key", "my_val",12345)
 ```
 
 In server 2
@@ -99,7 +98,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key2", "my_val2")
+bc.Set("my_key2", "my_val2", 12345)
 ```
 
 In server 3
@@ -114,7 +113,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exists := bc.Get("my_key2")
+val, exp, exists := bc.Get("my_key2")
 ```
 
 ## Credits
