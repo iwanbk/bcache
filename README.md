@@ -4,6 +4,8 @@
 [![Build Status](https://travis-ci.org/iwanbk/bcache.svg?branch=master)](https://travis-ci.org/iwanbk/bcache)
 [![codecov](https://codecov.io/gh/iwanbk/bcache/branch/master/graph/badge.svg)](https://codecov.io/gh/iwanbk/bcache)
 [![Go Report Card](https://goreportcard.com/badge/github.com/iwanbk/bcache)](https://goreportcard.com/report/github.com/iwanbk/bcache)
+[![CodeFactor](https://www.codefactor.io/repository/github/iwanbk/bcache/badge)](https://www.codefactor.io/repository/github/iwanbk/bcache)
+[![Maintainability](https://api.codeclimate.com/v1/badges/0535095fdd215f2e22ad/maintainability)](https://codeclimate.com/github/iwanbk/bcache/maintainability)
 
 A Go Library to create distributed in-memory cache inside your app.
 
