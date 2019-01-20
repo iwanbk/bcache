@@ -4,16 +4,16 @@
 [![Build Status](https://travis-ci.org/iwanbk/bcache.svg?branch=master)](https://travis-ci.org/iwanbk/bcache)
 [![codecov](https://codecov.io/gh/iwanbk/bcache/branch/master/graph/badge.svg)](https://codecov.io/gh/iwanbk/bcache)
 [![Go Report Card](https://goreportcard.com/badge/github.com/iwanbk/bcache)](https://goreportcard.com/report/github.com/iwanbk/bcache)
+[![CodeFactor](https://www.codefactor.io/repository/github/iwanbk/bcache/badge)](https://www.codefactor.io/repository/github/iwanbk/bcache)
+[![Maintainability](https://api.codeclimate.com/v1/badges/0535095fdd215f2e22ad/maintainability)](https://codeclimate.com/github/iwanbk/bcache/maintainability)
 
-A Go Library to create distributed in-memory cache.
-
-It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for data synchronization between peers.
+A Go Library to create distributed in-memory cache inside your app.
 
 ## Features
 
 - LRU cache with configurable maximum keys
 - Eventual Consistency synchronization between peers
-- Data are replicated to all peers
+- Data are replicated to all nodes
 - cache filling mechanism. When the cache of the given key is not exist, bcache coordinates cache fills such that only one call populates the cache to avoid thundering herd or [cache stampede](https://en.wikipedia.org/wiki/Cache_stampede)
 
 ## Why using it
@@ -22,10 +22,25 @@ It uses [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol) for dat
 - you only need cache with simple `Set` & `Get` operation
 - you have enough RAM to hold the cache data
 
-## Credits
+## How it Works
 
-- [weaveworks/mesh](https://github.com/weaveworks/mesh) for the gossip library
-- [groupcache](https://github.com/golang/groupcache) for the inspiration
+1. Nodes find each other using [Gossip Protocol](https://en.wikipedia.org/wiki/Gossip_protocol)
+
+Only need to specify one or few nodes as bootstrap nodes, and all nodes will find each other using gossip protocol
+
+2. When there is cache `set`, the event will be propagated to all of the nodes.
+
+So, all of the nodes will have synced data.
+
+
+## Expiration
+
+Although this library doesn't invalidate the keys when it reachs the expiration time,
+the expiration timestamp will be used as a way to decide which value is the newer when doing data synchronization
+among nodes.
+
+So, it is **mandatory** to set the expiration time.
+
 
 ## Cache filling
 
@@ -45,12 +60,11 @@ c, err := New(Config{
 	ListenAddr: "192.168.0.3:12345",
 	Peers:      []string{"192.168.0.1:12345"},
 	MaxKeys:    1000,
-	Logger:     logrus.New(),
 })
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exists,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
+val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
         // get value from database
          .....
          //
@@ -64,14 +78,14 @@ In server 1
 bc, err := New(Config{
 	// PeerID:     1, // leave it, will be set automatically based on mac addr
 	ListenAddr: "192.168.0.1:12345",
-	Peers:      nil,
+	Peers:      nil, // it nil because we will use this node as bootstrap node
 	MaxKeys:    1000,
 	Logger:     logrus.New(),
 })
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key", "my_val")
+bc.Set("my_key", "my_val",12345)
 ```
 
 In server 2
@@ -86,7 +100,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key2", "my_val2")
+bc.Set("my_key2", "my_val2", 12345)
 ```
 
 In server 3
@@ -101,6 +115,10 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exists := bc.Get("my_key2")
+val, exp, exists := bc.Get("my_key2")
 ```
 
+## Credits
+
+- [weaveworks/mesh](https://github.com/weaveworks/mesh) for the gossip library
+- [groupcache](https://github.com/golang/groupcache) for the inspiration
