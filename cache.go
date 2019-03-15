@@ -85,7 +85,8 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 	var existingKeys []string
 	for _, e := range msg.Entries {
 		_, exp, ok := c.get(e.Key)
-		if ok && exp < e.Expired {
+		if ok && exp >= e.Expired {
+			// the key already exists and has bigger expiration value
 			existingKeys = append(existingKeys, e.Key)
 			continue
 		}

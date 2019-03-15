@@ -33,7 +33,7 @@ func TestPeerOnGossip(t *testing.T) {
 			},
 		},
 		{
-			name: "new different message",
+			name: "new key",
 			initial: map[string]entry{
 				"key1": entry{
 					Key:     "key1",
@@ -69,16 +69,52 @@ func TestPeerOnGossip(t *testing.T) {
 				"key1": entry{
 					Key:     "key1",
 					Val:     "val2",
-					Expired: 1,
+					Expired: 2,
 				},
 			},
 			delta: map[string]entry{
 				"key1": entry{
 					Key:     "key1",
 					Val:     "val2",
+					Expired: 2,
+				},
+			},
+		},
+		{
+			name: "same key same val",
+			initial: map[string]entry{
+				"key1": entry{
+					Key:     "key1",
+					Val:     "val1",
 					Expired: 1,
 				},
 			},
+			newMsg: map[string]entry{
+				"key1": entry{
+					Key:     "key1",
+					Val:     "val1",
+					Expired: 1,
+				},
+			},
+			delta: nil,
+		},
+		{
+			name: "same key dif val same exp",
+			initial: map[string]entry{
+				"key1": entry{
+					Key:     "key1",
+					Val:     "val1",
+					Expired: 1,
+				},
+			},
+			newMsg: map[string]entry{
+				"key1": entry{
+					Key:     "key1",
+					Val:     "val2",
+					Expired: 1,
+				},
+			},
+			delta: nil,
 		},
 	}
 
@@ -104,7 +140,11 @@ func TestPeerOnGossip(t *testing.T) {
 			delta, err := p.OnGossip(buf)
 			require.NoError(t, err)
 
-			require.Equal(t, delta.(*message).Entries, tc.delta)
+			if tc.delta == nil {
+				require.Nil(t, delta)
+			} else {
+				require.Equal(t, tc.delta, delta.(*message).Entries)
+			}
 		})
 	}
 }
