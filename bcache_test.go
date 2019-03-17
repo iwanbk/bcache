@@ -11,12 +11,12 @@ import (
 )
 
 // Two nodes
-// peer 2 could read what peer 1 write
+// - peer 2 could read what peer 1 write
+// - peer 2 could update that value
 func TestSimple(t *testing.T) {
 	const (
-		key1 = "key1"
+		key  = "key1"
 		val1 = "val1"
-		key2 = "key2"
 		val2 = "val2"
 	)
 	var (
@@ -46,24 +46,24 @@ func TestSimple(t *testing.T) {
 	defer b2.Close()
 
 	// set from b1, and wait in b2
-	b1.Set(key1, val1, time.Now().Add(expiredIn).Unix())
+	b1.Set(key, val1, time.Now().Add(expiredIn).UnixNano())
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
 
-	get, exp, ok := b2.Get(key1)
+	get, exp, ok := b2.Get(key)
 	require.True(t, ok)
 	require.NotZero(t, exp)
 	require.Equal(t, val1, get)
 
 	// set from b2, and wait in b1
 
-	b2.Set(key2, val2, time.Now().Add(expiredIn).Unix())
+	b2.Set(key, val2, time.Now().Add(expiredIn).UnixNano())
 
 	// wait for it to propagate
 	time.Sleep(2 * time.Second)
 
-	get, exp, ok = b1.Get(key2)
+	get, exp, ok = b1.Get(key)
 	require.True(t, ok)
 	require.NotZero(t, exp)
 	require.Equal(t, val2, get)

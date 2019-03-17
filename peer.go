@@ -98,8 +98,13 @@ func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mes
 	return
 
 }
-func (p *peer) OnGossipUnicast(src mesh.PeerName, msg []byte) error {
-	p.logger.Errorf("[error]OnGossipUnicast unexpected call")
+
+func (p *peer) OnGossipUnicast(src mesh.PeerName, update []byte) error {
+	msg, err := newMessageFromBuf(update)
+	if err != nil {
+		return err
+	}
+	p.cc.mergeComplete(msg)
 	return nil
 }
 
@@ -112,12 +117,14 @@ func (p *peer) Set(key, val string, expiredTimestamp int64) {
 		// set our cache
 		p.cc.Set(key, val, expiredTimestamp)
 
-		if p.send == nil {
-			p.logger.Printf("no sender configured; not broadcasting update right now")
-		}
 		// construct & send the message
 		m := newMessage(p.name, 1)
 		m.add(key, val, expiredTimestamp)
+
+		if p.send == nil {
+			p.logger.Printf("no sender configured; not broadcasting update right now")
+			return
+		}
 		p.send.GossipBroadcast(m)
 	}
 
