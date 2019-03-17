@@ -74,8 +74,8 @@ func (m *message) mergeComplete(other *message) mesh.GossipData {
 	defer m.mux.Unlock()
 
 	for k, v := range other.Entries {
-		_, ok := m.Entries[k]
-		if !ok {
+		existing, ok := m.Entries[k]
+		if !ok || existing.Expired < v.Expired {
 			m.Entries[k] = v
 		}
 	}

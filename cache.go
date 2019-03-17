@@ -55,6 +55,21 @@ func (c *cache) Get(key string) (string, int64, bool) {
 	return c.get(key)
 }
 
+func (c *cache) Messages() *message {
+	m := newMessage(c.peerID, c.cc.Len())
+
+	for _, k := range c.cc.Keys() {
+		key := k.(string)
+		val, expired, ok := c.get(key)
+		if !ok {
+			continue
+		}
+		m.add(key, val, expired)
+	}
+	return m
+
+}
+
 // merges received data into state and returns a
 // representation of the received data (typically a delta) for further
 // propagation.
@@ -100,4 +115,15 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 	}
 
 	return newMessageFromEntries(c.peerID, msg.Entries), changedKey
+}
+
+func (c *cache) mergeComplete(msg *message) {
+	for _, ent := range msg.Entries {
+		_, exp, ok := c.get(ent.Key)
+		if !ok || exp < ent.Expired {
+			// if !exist in cache, set it
+			// if val in cache is older, set it
+			c.Set(ent.Key, ent.Val, ent.Expired)
+		}
+	}
 }

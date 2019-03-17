@@ -98,8 +98,13 @@ func (p *peer) OnGossipBroadcast(src mesh.PeerName, update []byte) (received mes
 	return
 
 }
-func (p *peer) OnGossipUnicast(src mesh.PeerName, msg []byte) error {
-	p.logger.Errorf("[error]OnGossipUnicast unexpected call")
+
+func (p *peer) OnGossipUnicast(src mesh.PeerName, update []byte) error {
+	msg, err := newMessageFromBuf(update)
+	if err != nil {
+		return err
+	}
+	p.cc.mergeComplete(msg)
 	return nil
 }
 
