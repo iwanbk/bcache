@@ -130,13 +130,11 @@ func TestPeerOnGossip(t *testing.T) {
 
 			// initial
 			msg := newMessageFromEntries(peerID1, tc.initial)
-			buf := msg.Encode()[0]
-			_, err = p.OnGossip(buf)
-			require.NoError(t, err)
+			p.cc.mergeComplete(msg)
 
 			// newMsg
 			newMsg := newMessageFromEntries(peerID1, tc.newMsg)
-			buf = newMsg.Encode()[0]
+			buf := newMsg.Encode()[0]
 			delta, err := p.OnGossip(buf)
 			require.NoError(t, err)
 
@@ -272,13 +270,11 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 
 			// initial
 			msg := newMessageFromEntries(peerID1, tc.initial)
-			buf := msg.Encode()[0]
-			_, err = p.OnGossip(buf)
-			require.NoError(t, err)
+			p.cc.mergeComplete(msg)
 
 			// newMsg
 			newMsg := newMessageFromEntries(peerID1, tc.newMsg)
-			buf = newMsg.Encode()[0]
+			buf := newMsg.Encode()[0]
 			delta, err := p.OnGossipBroadcast(mesh.UnknownPeerName, buf)
 			require.NoError(t, err)
 
@@ -427,13 +423,11 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 
 			// initial
 			msg := newMessageFromEntries(peerID1, tc.initial)
-			buf := msg.Encode()[0]
-			_, err = p.OnGossip(buf)
-			require.NoError(t, err)
+			p.cc.mergeComplete(msg)
 
 			// newMsg
 			newMsg := newMessageFromEntries(peerID1, tc.newMsg)
-			buf = newMsg.Encode()[0]
+			buf := newMsg.Encode()[0]
 			err = p.OnGossipUnicast(mesh.UnknownPeerName, buf)
 			require.NoError(t, err)
 
