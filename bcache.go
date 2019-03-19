@@ -106,6 +106,10 @@ func (b *Bcache) Get(key string) (string, int64, bool) {
 	return b.peer.Get(key)
 }
 
+func (b *Bcache) Delete(key string, expiredTimestamp int64) {
+	b.peer.Delete(key, expiredTimestamp)
+}
+
 // Filler defines func to be called when the given key is not exists
 type Filler func(key string) (val string, expired int64, err error)
 

@@ -6,31 +6,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
-// Two nodes
-// - peer 2 could read what peer 1 write
+// Three nodes
+// - peer 2 & 3 could read what peer 1 write
 // - peer 2 could update that value
-func TestSimple(t *testing.T) {
+// - delete propagated to other peers
+func TestIntegration(t *testing.T) {
 	const (
-		key  = "key1"
-		val1 = "val1"
-		val2 = "val2"
+		val1    = "val1"
+		val2    = "val2"
+		numKeys = 50
 	)
 	var (
+		keys      []string
 		expiredIn = 10 * time.Minute
+		waitDur   = 3 * time.Second
 	)
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
 	b1, err := New(Config{
 		PeerID:     1,
 		ListenAddr: "127.0.0.1:12345",
 		Peers:      nil,
 		MaxKeys:    1000,
-		Logger:     logger,
+		Logger:     &nopLogger{},
 	})
 	require.NoError(t, err)
 	defer b1.Close()
@@ -40,33 +40,82 @@ func TestSimple(t *testing.T) {
 		ListenAddr: "127.0.0.1:12346",
 		Peers:      []string{"127.0.0.1:12345"},
 		MaxKeys:    1000,
-		Logger:     logger,
+		Logger:     &nopLogger{},
 	})
 	require.NoError(t, err)
 	defer b2.Close()
 
-	// set from b1, and wait in b2
-	b1.Set(key, val1, time.Now().Add(expiredIn).UnixNano())
+	b3, err := New(Config{
+		PeerID:     3,
+		ListenAddr: "127.0.0.1:12356",
+		Peers:      []string{"127.0.0.1:12345"},
+		MaxKeys:    1000,
+		Logger:     &nopLogger{},
+	})
+	require.NoError(t, err)
+	defer b3.Close()
 
-	// wait for it to propagate
-	time.Sleep(2 * time.Second)
+	// generate keys
+	for i := 0; i < numKeys; i++ {
+		keys = append(keys, fmt.Sprintf("key-%d", i))
+	}
 
-	get, exp, ok := b2.Get(key)
-	require.True(t, ok)
-	require.NotZero(t, exp)
-	require.Equal(t, val1, get)
+	// ---------- set from b1, check in b2 & b3 -----------
+	for _, key := range keys {
+		b1.Set(key, val1, time.Now().Add(expiredIn).UnixNano())
+	}
 
-	// set from b2, and wait in b1
+	// wait for it to propagate and check from b2 b3
+	time.Sleep(waitDur)
 
-	b2.Set(key, val2, time.Now().Add(expiredIn).UnixNano())
+	for _, key := range keys {
+		get, exp, ok := b2.Get(key)
+		require.True(t, ok)
+		require.NotZero(t, exp)
+		require.Equal(t, val1, get)
 
-	// wait for it to propagate
-	time.Sleep(2 * time.Second)
+		get, exp, ok = b3.Get(key)
+		require.True(t, ok)
+		require.NotZero(t, exp)
+		require.Equal(t, val1, get)
 
-	get, exp, ok = b1.Get(key)
-	require.True(t, ok)
-	require.NotZero(t, exp)
-	require.Equal(t, val2, get)
+	}
+
+	// ----------- set from b2, check in b1 & b3 --------------
+	for _, key := range keys {
+		b2.Set(key, val2, time.Now().Add(expiredIn).UnixNano())
+	}
+
+	// wait for it to propagate and check from b1 & b3
+	time.Sleep(waitDur)
+
+	for _, key := range keys {
+		get, exp, ok := b1.Get(key)
+		require.True(t, ok)
+		require.NotZero(t, exp)
+		require.Equal(t, val2, get)
+
+		get, exp, ok = b3.Get(key)
+		require.True(t, ok)
+		require.NotZero(t, exp)
+		require.Equal(t, val2, get)
+
+	}
+
+	// ------ delete from b1, and check  b2 & b3 ----------
+	for _, key := range keys {
+		b1.Delete(key, time.Now().Add(expiredIn).UnixNano())
+	}
+	// wait for it to propagate and check from b2
+	time.Sleep(waitDur)
+
+	for _, key := range keys {
+		_, _, exists := b2.Get(key)
+		require.False(t, exists)
+
+		_, _, exists = b3.Get(key)
+		require.False(t, exists)
+	}
 
 }
 
@@ -91,7 +140,7 @@ func TestJoinLater(t *testing.T) {
 		ListenAddr: "127.0.0.1:12347",
 		Peers:      nil,
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     &nopLogger{},
 	})
 	require.NoError(t, err)
 	defer b1.Close()
@@ -106,7 +155,7 @@ func TestJoinLater(t *testing.T) {
 		ListenAddr: "127.0.0.1:12348",
 		Peers:      []string{"127.0.0.1:12347"},
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     &nopLogger{},
 	})
 	require.NoError(t, err)
 	defer b2.Close()
@@ -164,7 +213,7 @@ func TestFiller(t *testing.T) {
 		PeerID:     2,
 		ListenAddr: "127.0.0.1:12349",
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     &nopLogger{},
 	})
 	require.NoError(t, err)
 	defer bc.Close()
@@ -189,7 +238,7 @@ func TestValidationError(t *testing.T) {
 		ListenAddr: "127.0.0.1",
 		Peers:      nil,
 		MaxKeys:    1000,
-		Logger:     logrus.New(),
+		Logger:     &nopLogger{},
 	}
 
 	_, err := New(c)

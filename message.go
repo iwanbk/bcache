@@ -24,6 +24,7 @@ type entry struct {
 	Key     string
 	Val     string
 	Expired int64
+	Deleted bool
 }
 
 func newMessage(peerID mesh.PeerName, numEntries int) *message {
@@ -46,11 +47,12 @@ func newMessageFromBuf(b []byte) (*message, error) {
 	return &m, err
 }
 
-func (m *message) add(key, val string, expired int64) {
+func (m *message) add(key, val string, expired int64, deleted bool) {
 	m.Entries[key] = entry{
 		Key:     key,
 		Val:     val,
 		Expired: expired,
+		Deleted: deleted,
 	}
 }
 

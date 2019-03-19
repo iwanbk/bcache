@@ -29,30 +29,48 @@ func newCache(maxKeys int) (*cache, error) {
 type value struct {
 	value   string
 	expired int64
+	deleted bool
 }
 
 // Set sets the value of a cache
-func (c *cache) Set(key, val string, expiredTimestamp int64) {
+func (c *cache) Set(key, val string, expiredTimestamp int64, deleted bool) {
 	c.cc.Add(key, value{
 		value:   val,
 		expired: expiredTimestamp,
+		deleted: deleted,
 	})
 
 }
 
+// Delete del the value of a cache.
+// returns true if the key exists in cache, false otherwise
+func (c *cache) Delete(key string, expiredTimestamp int64) bool {
+	val, ok := c.get(key)
+	if !ok {
+		return false
+	}
+	c.Set(key, val.value, expiredTimestamp, true)
+
+	return true
+}
+
 // Get gets cache value of the given key
-func (c *cache) get(key string) (string, int64, bool) {
+func (c *cache) get(key string) (*value, bool) {
 	cacheVal, ok := c.cc.Get(key)
 	if !ok {
-		return "", 0, false
+		return nil, false
 	}
 	val := cacheVal.(value)
-	return val.value, val.expired, true
+	return &val, true
 }
 
 // Get gets cache value of the given key
 func (c *cache) Get(key string) (string, int64, bool) {
-	return c.get(key)
+	val, ok := c.get(key)
+	if !ok || val.deleted {
+		return "", 0, false
+	}
+	return val.value, val.expired, true
 }
 
 func (c *cache) Messages() *message {
@@ -60,11 +78,11 @@ func (c *cache) Messages() *message {
 
 	for _, k := range c.cc.Keys() {
 		key := k.(string)
-		val, expired, ok := c.get(key)
+		cacheVal, ok := c.get(key)
 		if !ok {
 			continue
 		}
-		m.add(key, val, expired)
+		m.add(key, cacheVal.value, cacheVal.expired, cacheVal.deleted)
 	}
 	return m
 
@@ -99,13 +117,13 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 
 	var existingKeys []string
 	for _, e := range msg.Entries {
-		_, exp, ok := c.get(e.Key)
-		if ok && exp >= e.Expired {
+		cacheVal, ok := c.get(e.Key)
+		if ok && cacheVal.expired >= e.Expired {
 			// the key already exists and has bigger expiration value
 			existingKeys = append(existingKeys, e.Key)
 			continue
 		}
-		c.Set(e.Key, e.Val, e.Expired)
+		c.Set(e.Key, e.Val, e.Expired, e.Deleted)
 		changedKey++
 	}
 
@@ -119,11 +137,11 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 
 func (c *cache) mergeComplete(msg *message) {
 	for _, ent := range msg.Entries {
-		_, exp, ok := c.get(ent.Key)
-		if !ok || exp < ent.Expired {
+		cacheVal, ok := c.get(ent.Key)
+		if !ok || cacheVal.expired < ent.Expired {
 			// if !exist in cache, set it
 			// if val in cache is older, set it
-			c.Set(ent.Key, ent.Val, ent.Expired)
+			c.Set(ent.Key, ent.Val, ent.Expired, ent.Deleted)
 		}
 	}
 }

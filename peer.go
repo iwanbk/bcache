@@ -40,17 +40,7 @@ func (p *peer) register(send mesh.Gossip) {
 
 // Gossip implements mesh.Gossiper.Gossip
 func (p *peer) Gossip() mesh.GossipData {
-	m := newMessage(p.name, p.cc.cc.Len())
-
-	for _, k := range p.cc.cc.Keys() {
-		key := k.(string)
-		val, expired, ok := p.cc.get(key)
-		if !ok {
-			continue
-		}
-		m.add(key, val, expired)
-	}
-	return m
+	return p.cc.Messages()
 }
 
 // OnGossip merges received data into state and returns "everything new
@@ -115,20 +105,39 @@ func (p *peer) Set(key, val string, expiredTimestamp int64) {
 		defer close(c)
 
 		// set our cache
-		p.cc.Set(key, val, expiredTimestamp)
+		p.cc.Set(key, val, expiredTimestamp, false)
 
 		// construct & send the message
 		m := newMessage(p.name, 1)
-		m.add(key, val, expiredTimestamp)
+		m.add(key, val, expiredTimestamp, false)
 
-		if p.send == nil {
-			p.logger.Printf("no sender configured; not broadcasting update right now")
-			return
-		}
-		p.send.GossipBroadcast(m)
+		p.broadcast(m)
 	}
 
 	<-c // wait for it to be finished
+}
+
+func (p *peer) Delete(key string, expiredTimestamp int64) bool {
+	var (
+		c     = make(chan struct{})
+		exist bool
+	)
+
+	p.actionCh <- func() {
+		defer close(c)
+
+		// set our cache
+		exist = p.cc.Delete(key, expiredTimestamp)
+
+		// construct & send the message
+		m := newMessage(p.name, 1)
+		m.add(key, "", expiredTimestamp, true)
+
+		p.broadcast(m)
+	}
+
+	<-c // wait for it to be finished
+	return exist
 }
 
 func (p *peer) Get(key string) (string, int64, bool) {
@@ -144,4 +153,12 @@ func (p *peer) loop() {
 			return
 		}
 	}
+}
+
+func (p *peer) broadcast(msg *message) {
+	if p.send == nil {
+		return
+	}
+	p.send.GossipBroadcast(msg)
+
 }
