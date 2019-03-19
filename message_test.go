@@ -11,13 +11,13 @@ func TestMessageMerge(t *testing.T) {
 	testCases := []struct {
 		name     string
 		initial  map[string]entry
-		newMsg   map[string]entry
+		other    map[string]entry
 		complete map[string]entry
 	}{
 		{
 			name:    "from empty",
 			initial: map[string]entry{},
-			newMsg: map[string]entry{
+			other: map[string]entry{
 				"key2": entry{
 					Key:     "key2",
 					Val:     "val2",
@@ -41,7 +41,7 @@ func TestMessageMerge(t *testing.T) {
 					Expired: 1,
 				},
 			},
-			newMsg: map[string]entry{
+			other: map[string]entry{
 				"key2": entry{
 					Key:     "key2",
 					Val:     "val2",
@@ -70,7 +70,7 @@ func TestMessageMerge(t *testing.T) {
 					Expired: 1,
 				},
 			},
-			newMsg: map[string]entry{
+			other: map[string]entry{
 				"key1": entry{
 					Key:     "key1",
 					Val:     "val2",
@@ -94,7 +94,7 @@ func TestMessageMerge(t *testing.T) {
 					Expired: 1,
 				},
 			},
-			newMsg: map[string]entry{
+			other: map[string]entry{
 				"key1": entry{
 					Key:     "key1",
 					Val:     "val1",
@@ -118,7 +118,7 @@ func TestMessageMerge(t *testing.T) {
 					Expired: 1,
 				},
 			},
-			newMsg: map[string]entry{
+			other: map[string]entry{
 				"key1": entry{
 					Key:     "key1",
 					Val:     "val2",
@@ -144,8 +144,8 @@ func TestMessageMerge(t *testing.T) {
 			// initial
 			msg := newMessageFromEntries(peerID1, tc.initial)
 
-			// newMsg
-			newMsg := newMessageFromEntries(peerID1, tc.newMsg)
+			// other
+			newMsg := newMessageFromEntries(peerID1, tc.other)
 
 			complete := msg.Merge(newMsg)
 
