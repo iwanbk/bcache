@@ -48,17 +48,22 @@ func newMessageFromBuf(b []byte) (*message, error) {
 }
 
 func (m *message) add(key, val string, expired int64, deleted bool) {
+	m.mux.Lock()
 	m.Entries[key] = entry{
 		Key:     key,
 		Val:     val,
 		Expired: expired,
 		Deleted: deleted,
 	}
+	m.mux.Unlock()
 }
 
 // Encode implements mesh.GossipData.Encode
 // TODO: split the encoding by X number of keys
 func (m *message) Encode() [][]byte {
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+
 	b, err := marshal(m)
 	if err != nil {
 		log.Printf("failed to encode message: %v", err)
