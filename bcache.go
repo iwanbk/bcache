@@ -15,6 +15,8 @@ const (
 )
 
 var (
+	// ErrNilFiller returned when GetWithFiller called with nil
+	// filler func
 	ErrNilFiller = errors.New("nil filler")
 )
 
@@ -95,17 +97,26 @@ func New(cfg Config) (*Bcache, error) {
 
 // Set sets value for the given key.
 //
-// expiredTimestamp is unix timestamp when this key will be expired.
+// expiredTimestamp could be used in these way:
+//
+// 		- unix timestamp when this key will be expired
+//		- as a way to decide which value is the newer when doing data synchronization among nodes
 func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
 	b.peer.Set(key, val, expiredTimestamp)
 }
 
 // Get gets value for the given key.
-// It returns the value, timestamp, and true if the key exists
+//
+// It returns the value, expiration timestamp, and true if the key exists
 func (b *Bcache) Get(key string) (string, int64, bool) {
 	return b.peer.Get(key)
 }
 
+// Delete the given key.
+//
+// The given timestamp is used to decide which operation is the lastes when doing syncronization.
+//
+// For example: `Delete` with timestamp 3 and `Set` with timestamp 4 -> `Set` is the latest, so the `Delete` is ignored
 func (b *Bcache) Delete(key string, expiredTimestamp int64) {
 	b.peer.Delete(key, expiredTimestamp)
 }
@@ -122,7 +133,7 @@ type Filler func(key string) (val string, expired int64, err error)
 // will only called once for each of the key.
 //
 //
-// It useful to avoid thundering herd or cache stampede to  the underlying database
+// It useful to avoid cache stampede to  the underlying database
 func (b *Bcache) GetWithFiller(key string, filler Filler) (string, int64, error) {
 	if filler == nil {
 		return "", 0, ErrNilFiller

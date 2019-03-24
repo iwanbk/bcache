@@ -4,7 +4,6 @@
 [![Build Status](https://travis-ci.org/iwanbk/bcache.svg?branch=master)](https://travis-ci.org/iwanbk/bcache)
 [![codecov](https://codecov.io/gh/iwanbk/bcache/branch/master/graph/badge.svg)](https://codecov.io/gh/iwanbk/bcache)
 [![Go Report Card](https://goreportcard.com/badge/github.com/iwanbk/bcache)](https://goreportcard.com/report/github.com/iwanbk/bcache)
-[![CodeFactor](https://www.codefactor.io/repository/github/iwanbk/bcache/badge)](https://www.codefactor.io/repository/github/iwanbk/bcache)
 [![Maintainability](https://api.codeclimate.com/v1/badges/0535095fdd215f2e22ad/maintainability)](https://codeclimate.com/github/iwanbk/bcache/maintainability)
 
 A Go Library to create distributed in-memory cache inside your app.
@@ -36,10 +35,22 @@ So, all of the nodes will have synced data.
 ## Expiration
 
 Although this library doesn't invalidate the keys when it reachs the expiration time,
-the expiration timestamp will be used as a way to decide which value is the newer when doing data synchronization
-among nodes.
+the expiration timestamp will be used in these ways:
 
-So, it is **mandatory** to set the expiration time.
+(1) On `Set`:
+- as a way to decide which value is the newer when doing data synchronization among nodes
+- set timestamp expiration
+
+(2) On `Get`:
+- the expiration timestamp could be used to check whether the key has been expired
+
+(3) On `Delete`:
+- to decide which operation is the lastes when doing syncronization, for example:
+	- `Delete` with timestamp 3 and `Set` with timestamp 4 -> `Set` is the latest, so the `Delete` is ignored
+
+So, it is **mandatory** to set the expiration time and the delta from current time must be the same
+between `Set` and `Delete`.
+We can also use [UnixNano](https://golang.org/pkg/time/#Time.UnixNano) for better precission than `Unix`.
 
 
 ## Cache filling
@@ -54,23 +65,6 @@ Even there are many goroutines which call `GetWithFiller`, the given `Filler` fu
 will only called once for each of the key.
 Cache stampede could be avoided this way.
 
-```go
-c, err := New(Config{
-	PeerID:     3,
-	ListenAddr: "192.168.0.3:12345",
-	Peers:      []string{"192.168.0.1:12345"},
-	MaxKeys:    1000,
-})
-if err != nil {
-    log.Fatalf("failed to create cache: %v", err)
-}
-val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
-        // get value from database
-         .....
-         //
-		return value, 0, nil
-})
-```
 ## Quick Start
 
 In server 1
@@ -116,6 +110,26 @@ if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
 val, exp, exists := bc.Get("my_key2")
+```
+
+### GetWithFiller example
+
+```go
+c, err := New(Config{
+	PeerID:     3,
+	ListenAddr: "192.168.0.3:12345",
+	Peers:      []string{"192.168.0.1:12345"},
+	MaxKeys:    1000,
+})
+if err != nil {
+    log.Fatalf("failed to create cache: %v", err)
+}
+val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
+        // get value from database
+         .....
+         //
+		return value, 0, nil
+})
 ```
 
 ## Credits
