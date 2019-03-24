@@ -18,14 +18,14 @@ func TestPeerOnGossip(t *testing.T) {
 			name:    "from empty",
 			initial: map[string]entry{},
 			newMsg: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			delta: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -35,21 +35,21 @@ func TestPeerOnGossip(t *testing.T) {
 		{
 			name: "new key",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			delta: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -59,21 +59,21 @@ func TestPeerOnGossip(t *testing.T) {
 		{
 			name: "same key diff val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
 				},
 			},
 			delta: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
@@ -83,14 +83,14 @@ func TestPeerOnGossip(t *testing.T) {
 		{
 			name: "same key same val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
@@ -101,14 +101,14 @@ func TestPeerOnGossip(t *testing.T) {
 		{
 			name: "same key dif val same exp",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 1,
@@ -119,21 +119,21 @@ func TestPeerOnGossip(t *testing.T) {
 		{
 			name: "delete",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Expired: 2,
 					Deleted: true,
 				},
 			},
 			delta: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
@@ -183,14 +183,14 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 			name:    "from empty",
 			initial: map[string]entry{},
 			broadcast: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			delta: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -200,21 +200,21 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 		{
 			name: "new key",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			broadcast: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			delta: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -224,21 +224,21 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 		{
 			name: "same key diff val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			broadcast: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
 				},
 			},
 			delta: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
@@ -248,14 +248,14 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 		{
 			name: "same key same val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			broadcast: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
@@ -266,14 +266,14 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 		{
 			name: "same key dif val same exp",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			broadcast: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 1,
@@ -284,21 +284,21 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 		{
 			name: "delete",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			broadcast: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Expired: 2,
 					Deleted: true,
 				},
 			},
 			delta: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
@@ -344,14 +344,14 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 			name:    "from empty",
 			initial: map[string]entry{},
 			newMsg: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			complete: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -361,26 +361,26 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 		{
 			name: "new key",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			complete: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
-				"key2": entry{
+				"key2": {
 					Key:     "key2",
 					Val:     "val2",
 					Expired: 1,
@@ -390,21 +390,21 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 		{
 			name: "same key diff val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
 				},
 			},
 			complete: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 2,
@@ -414,21 +414,21 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 		{
 			name: "same key same val",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			complete: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
@@ -438,21 +438,21 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 		{
 			name: "same key dif val same exp",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val2",
 					Expired: 1,
 				},
 			},
 			complete: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
@@ -462,21 +462,21 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 		{
 			name: "delete",
 			initial: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "val1",
 					Expired: 1,
 				},
 			},
 			newMsg: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Expired: 2,
 					Deleted: true,
 				},
 			},
 			complete: map[string]entry{
-				"key1": entry{
+				"key1": {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
