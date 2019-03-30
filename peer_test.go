@@ -129,7 +129,7 @@ func TestPeerOnGossip(t *testing.T) {
 				"key1": {
 					Key:     "key1",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 			delta: map[string]entry{
@@ -137,7 +137,7 @@ func TestPeerOnGossip(t *testing.T) {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 		},
@@ -294,7 +294,7 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 				"key1": {
 					Key:     "key1",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 			delta: map[string]entry{
@@ -302,7 +302,7 @@ func TestPeerOnGossipBroadcast(t *testing.T) {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 		},
@@ -472,7 +472,7 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 				"key1": {
 					Key:     "key1",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 			complete: map[string]entry{
@@ -480,7 +480,7 @@ func TestPeerOnGossipUnicast(t *testing.T) {
 					Key:     "key1",
 					Val:     "",
 					Expired: 2,
-					Deleted: true,
+					Deleted: 1,
 				},
 			},
 		},

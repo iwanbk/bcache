@@ -20,37 +20,40 @@ func TestIntegration(t *testing.T) {
 		numKeys = 50
 	)
 	var (
-		keys      []string
-		expiredIn = 10 * time.Minute
-		waitDur   = 3 * time.Second
+		keys    []string
+		ttl     = 60
+		waitDur = 3 * time.Second
 	)
 
 	b1, err := New(Config{
-		PeerID:     1,
-		ListenAddr: "127.0.0.1:12345",
-		Peers:      nil,
-		MaxKeys:    1000,
-		Logger:     &nopLogger{},
+		PeerID:        1,
+		ListenAddr:    "127.0.0.1:12345",
+		Peers:         nil,
+		MaxKeys:       1000,
+		Logger:        &nopLogger{},
+		DeletionDelay: 1,
 	})
 	require.NoError(t, err)
 	defer b1.Close()
 
 	b2, err := New(Config{
-		PeerID:     2,
-		ListenAddr: "127.0.0.1:12346",
-		Peers:      []string{"127.0.0.1:12345"},
-		MaxKeys:    1000,
-		Logger:     &nopLogger{},
+		PeerID:        2,
+		ListenAddr:    "127.0.0.1:12346",
+		Peers:         []string{"127.0.0.1:12345"},
+		MaxKeys:       1000,
+		Logger:        &nopLogger{},
+		DeletionDelay: 1,
 	})
 	require.NoError(t, err)
 	defer b2.Close()
 
 	b3, err := New(Config{
-		PeerID:     3,
-		ListenAddr: "127.0.0.1:12356",
-		Peers:      []string{"127.0.0.1:12345"},
-		MaxKeys:    1000,
-		Logger:     &nopLogger{},
+		PeerID:        3,
+		ListenAddr:    "127.0.0.1:12356",
+		Peers:         []string{"127.0.0.1:12345"},
+		MaxKeys:       1000,
+		Logger:        &nopLogger{},
+		DeletionDelay: 1,
 	})
 	require.NoError(t, err)
 	defer b3.Close()
@@ -62,58 +65,58 @@ func TestIntegration(t *testing.T) {
 
 	// ---------- set from b1, check in b2 & b3 -----------
 	for _, key := range keys {
-		b1.Set(key, val1, time.Now().Add(expiredIn).UnixNano())
+		b1.Set(key, val1, ttl)
 	}
 
 	// wait for it to propagate and check from b2 b3
 	time.Sleep(waitDur)
 
 	for _, key := range keys {
-		get, exp, ok := b2.Get(key)
+		get, ok := b2.Get(key)
 		require.True(t, ok)
-		require.NotZero(t, exp)
 		require.Equal(t, val1, get)
 
-		get, exp, ok = b3.Get(key)
+		get, ok = b3.Get(key)
 		require.True(t, ok)
-		require.NotZero(t, exp)
 		require.Equal(t, val1, get)
 
 	}
 
 	// ----------- set from b2, check in b1 & b3 --------------
 	for _, key := range keys {
-		b2.Set(key, val2, time.Now().Add(expiredIn).UnixNano())
+		b2.Set(key, val2, ttl)
 	}
 
 	// wait for it to propagate and check from b1 & b3
 	time.Sleep(waitDur)
 
 	for _, key := range keys {
-		get, exp, ok := b1.Get(key)
+		get, ok := b1.Get(key)
 		require.True(t, ok)
-		require.NotZero(t, exp)
 		require.Equal(t, val2, get)
 
-		get, exp, ok = b3.Get(key)
+		get, ok = b3.Get(key)
 		require.True(t, ok)
-		require.NotZero(t, exp)
 		require.Equal(t, val2, get)
 
 	}
 
 	// ------ delete from b1, and check  b2 & b3 ----------
 	for _, key := range keys {
-		b1.Delete(key, time.Now().Add(expiredIn).UnixNano())
+		b1.Delete(key)
 	}
-	// wait for it to propagate and check from b2
+
+	// wait for it to propagate and check from b2 & b3
 	time.Sleep(waitDur)
 
 	for _, key := range keys {
-		_, _, exists := b2.Get(key)
+		_, exists := b1.Get(key)
 		require.False(t, exists)
 
-		_, _, exists = b3.Get(key)
+		_, exists = b2.Get(key)
+		require.False(t, exists)
+
+		_, exists = b3.Get(key)
 		require.False(t, exists)
 	}
 
@@ -125,8 +128,8 @@ func TestJoinLater(t *testing.T) {
 		numKeys = 15
 	)
 	var (
-		keyvals   = make(map[string]string)
-		expiredIn = 10 * time.Minute
+		keyvals = make(map[string]string)
+		ttl     = 60
 	)
 	for i := 0; i < numKeys; i++ {
 		k := fmt.Sprintf("key_%d", i)
@@ -147,7 +150,7 @@ func TestJoinLater(t *testing.T) {
 
 	// set values
 	for k, v := range keyvals {
-		b1.Set(k, v, time.Now().Add(expiredIn).Unix())
+		b1.Set(k, v, ttl)
 	}
 
 	b2, err := New(Config{
@@ -165,7 +168,7 @@ func TestJoinLater(t *testing.T) {
 
 	// check we could get it from b2
 	for k, v := range keyvals {
-		got, _, ok := b2.Get(k)
+		got, ok := b2.Get(k)
 		require.True(t, ok)
 		require.Equal(t, v, got)
 	}
@@ -174,7 +177,7 @@ func TestJoinLater(t *testing.T) {
 func TestFiller(t *testing.T) {
 	var (
 		errFillerFailed = errors.New("filler failed")
-		expiredIn       = 10 * time.Minute
+		ttl             = 600
 	)
 
 	testCases := []struct {
@@ -192,8 +195,8 @@ func TestFiller(t *testing.T) {
 		},
 		{
 			name: "valid filler",
-			filler: func(key string) (string, int64, error) {
-				return key, time.Now().Add(expiredIn).Unix(), nil
+			filler: func(key string) (string, error) {
+				return key, nil
 			},
 			key: "valid",
 			err: nil,
@@ -201,8 +204,8 @@ func TestFiller(t *testing.T) {
 		},
 		{
 			name: "failed filler",
-			filler: func(key string) (string, int64, error) {
-				return "", time.Now().Add(expiredIn).Unix(), errFillerFailed
+			filler: func(key string) (string, error) {
+				return "", errFillerFailed
 			},
 			key: "failed",
 			err: errFillerFailed,
@@ -220,13 +223,12 @@ func TestFiller(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			val, exp, err := bc.GetWithFiller(tc.key, tc.filler)
+			val, err := bc.GetWithFiller(tc.key, tc.filler, ttl)
 			require.Equal(t, tc.err, err)
 			if tc.err != nil {
 				return
 			}
 			require.Equal(t, tc.key, val)
-			require.NotZero(t, exp)
 		})
 	}
 }

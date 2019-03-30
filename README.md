@@ -27,30 +27,10 @@ A Go Library to create distributed in-memory cache inside your app.
 
 Only need to specify one or few nodes as bootstrap nodes, and all nodes will find each other using gossip protocol
 
-2. When there is cache `set`, the event will be propagated to all of the nodes.
+2. When there is cache `Set` and `Delete`, the event will be propagated to all of the nodes.
 
-So, all of the nodes will have synced data.
+So, all of the nodes will eventually have synced data.
 
-
-## Expiration
-
-Although this library doesn't invalidate the keys when it reachs the expiration time,
-the expiration timestamp will be used in these ways:
-
-(1) On `Set`:
-- as a way to decide which value is the newer when doing data synchronization among nodes
-- set timestamp expiration
-
-(2) On `Get`:
-- the expiration timestamp could be used to check whether the key has been expired
-
-(3) On `Delete`:
-- to decide which operation is the lastes when doing syncronization, for example:
-	- `Delete` with timestamp 3 and `Set` with timestamp 4 -> `Set` is the latest, so the `Delete` is ignored
-
-So, it is **mandatory** to set the expiration time and the delta from current time must be the same
-between `Set` and `Delete`.
-We can also use [UnixNano](https://golang.org/pkg/time/#Time.UnixNano) for better precission than `Unix`.
 
 
 ## Cache filling
@@ -79,7 +59,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key", "my_val",12345)
+bc.Set("my_key", "my_val",86400)
 ```
 
 In server 2
@@ -94,7 +74,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-bc.Set("my_key2", "my_val2", 12345)
+bc.Set("my_key2", "my_val2", 86400)
 ```
 
 In server 3
@@ -109,7 +89,7 @@ bc, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exp, exists := bc.Get("my_key2")
+val, exists := bc.Get("my_key2")
 ```
 
 ### GetWithFiller example
@@ -124,12 +104,12 @@ c, err := New(Config{
 if err != nil {
     log.Fatalf("failed to create cache: %v", err)
 }
-val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, int64, error) {
+val, exp,err  := bc.GetWithFiller("my_key2",func(key string) (string, error) {
         // get value from database
          .....
          //
 		return value, 0, nil
-})
+}, 86400)
 ```
 
 ## Credits
