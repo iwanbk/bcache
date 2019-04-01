@@ -24,7 +24,7 @@ type entry struct {
 	Key     string
 	Val     string
 	Expired int64
-	Deleted bool
+	Deleted int64
 }
 
 func newMessage(peerID mesh.PeerName, numEntries int) *message {
@@ -47,7 +47,7 @@ func newMessageFromBuf(b []byte) (*message, error) {
 	return &m, err
 }
 
-func (m *message) add(key, val string, expired int64, deleted bool) {
+func (m *message) add(key, val string, expired, deleted int64) {
 	m.mux.Lock()
 	m.Entries[key] = entry{
 		Key:     key,
@@ -82,6 +82,10 @@ func (m *message) mergeComplete(other *message) mesh.GossipData {
 
 	for k, v := range other.Entries {
 		existing, ok := m.Entries[k]
+
+		// merge
+		// - the key not exists in
+		// - has less expiration time
 		if !ok || existing.Expired < v.Expired {
 			m.Entries[k] = v
 		}

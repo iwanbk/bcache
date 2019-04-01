@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/weaveworks/mesh"
 	"golang.org/x/sync/singleflight"
@@ -22,10 +23,11 @@ var (
 
 // Bcache represents bcache struct
 type Bcache struct {
-	peer   *peer
-	router *mesh.Router
-	logger Logger
-	flight singleflight.Group
+	peer          *peer
+	router        *mesh.Router
+	logger        Logger
+	flight        singleflight.Group
+	deletionDelay time.Duration
 }
 
 // New creates new bcache from the given config
@@ -89,40 +91,45 @@ func New(cfg Config) (*Bcache, error) {
 	router.ConnectionMaker.InitiateConnections(cfg.Peers, true)
 
 	return &Bcache{
-		peer:   peer,
-		router: router,
-		logger: logger,
+		peer:          peer,
+		router:        router,
+		logger:        logger,
+		deletionDelay: time.Duration(cfg.DeletionDelay) * time.Second,
 	}, nil
 }
 
-// Set sets value for the given key.
-//
-// expiredTimestamp could be used in these way:
-//
-// 		- unix timestamp when this key will be expired
-//		- as a way to decide which value is the newer when doing data synchronization among nodes
-func (b *Bcache) Set(key, val string, expiredTimestamp int64) {
-	b.peer.Set(key, val, expiredTimestamp)
+// Set sets value for the given key with the given ttl in second.
+// if ttl <= 0, the key will expired instantly
+func (b *Bcache) Set(key, val string, ttl int) {
+	if ttl <= 0 {
+		b.Delete(key)
+		return
+	}
+	b.set(key, val, ttl)
+}
+
+func (b *Bcache) set(key, val string, ttl int) int64 {
+	expired := time.Now().Add(time.Duration(ttl) * time.Second).UnixNano()
+	b.peer.Set(key, val, expired)
+	return expired
 }
 
 // Get gets value for the given key.
 //
-// It returns the value, expiration timestamp, and true if the key exists
-func (b *Bcache) Get(key string) (string, int64, bool) {
+// It returns the value and true if the key exists
+func (b *Bcache) Get(key string) (string, bool) {
 	return b.peer.Get(key)
 }
 
 // Delete the given key.
 //
-// The given timestamp is used to decide which operation is the lastes when doing syncronization.
-//
-// For example: `Delete` with timestamp 3 and `Set` with timestamp 4 -> `Set` is the latest, so the `Delete` is ignored
-func (b *Bcache) Delete(key string, expiredTimestamp int64) {
-	b.peer.Delete(key, expiredTimestamp)
+func (b *Bcache) Delete(key string) {
+	deleteTs := time.Now().Add(b.deletionDelay).UnixNano()
+	b.peer.Delete(key, deleteTs)
 }
 
 // Filler defines func to be called when the given key is not exists
-type Filler func(key string) (val string, expired int64, err error)
+type Filler func(key string) (val string, err error)
 
 // GetWithFiller gets value for the given key and fill the cache
 // if the given key is not exists.
@@ -134,27 +141,26 @@ type Filler func(key string) (val string, expired int64, err error)
 //
 //
 // It useful to avoid cache stampede to  the underlying database
-func (b *Bcache) GetWithFiller(key string, filler Filler) (string, int64, error) {
+func (b *Bcache) GetWithFiller(key string, filler Filler, ttl int) (string, error) {
 	if filler == nil {
-		return "", 0, ErrNilFiller
+		return "", ErrNilFiller
 	}
 
 	// get value from cache
-	val, exp, ok := b.Get(key)
+	val, ok := b.Get(key)
 	if ok {
-		return val, exp, nil
+		return val, nil
 	}
 
 	// construct singleflight filler
 	flightFn := func() (interface{}, error) {
-		val, expired, err := filler(key)
+		val, err := filler(key)
 		if err != nil {
 			b.logger.Errorf("filler failed: %v", err)
 			return nil, err
 		}
 
-		// set the key if filler OK
-		b.peer.Set(key, val, expired)
+		expired := b.set(key, val, ttl)
 
 		return value{
 			value:   val,
@@ -167,12 +173,12 @@ func (b *Bcache) GetWithFiller(key string, filler Filler) (string, int64, error)
 		return flightFn()
 	})
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 
 	// return the value
 	value := valueIf.(value)
-	return value.value, value.expired, nil
+	return value.value, nil
 }
 
 // Close closes the cache, free all the resource

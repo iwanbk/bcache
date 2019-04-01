@@ -105,11 +105,11 @@ func (p *peer) Set(key, val string, expiredTimestamp int64) {
 		defer close(c)
 
 		// set our cache
-		p.cc.Set(key, val, expiredTimestamp, false)
+		p.cc.Set(key, val, expiredTimestamp, 0)
 
 		// construct & send the message
 		m := newMessage(p.name, 1)
-		m.add(key, val, expiredTimestamp, false)
+		m.add(key, val, expiredTimestamp, 0)
 
 		p.broadcast(m)
 	}
@@ -117,7 +117,7 @@ func (p *peer) Set(key, val string, expiredTimestamp int64) {
 	<-c // wait for it to be finished
 }
 
-func (p *peer) Delete(key string, expiredTimestamp int64) bool {
+func (p *peer) Delete(key string, deleteTimestamp int64) bool {
 	var (
 		c     = make(chan struct{})
 		exist bool
@@ -126,12 +126,15 @@ func (p *peer) Delete(key string, expiredTimestamp int64) bool {
 	p.actionCh <- func() {
 		defer close(c)
 
-		// set our cache
-		exist = p.cc.Delete(key, expiredTimestamp)
+		// delete from our cache
+		val, expired, exist := p.cc.Delete(key, deleteTimestamp)
+		if !exist {
+			return
+		}
 
 		// construct & send the message
 		m := newMessage(p.name, 1)
-		m.add(key, "", expiredTimestamp, true)
+		m.add(key, val, expired, deleteTimestamp)
 
 		p.broadcast(m)
 	}
@@ -140,7 +143,7 @@ func (p *peer) Delete(key string, expiredTimestamp int64) bool {
 	return exist
 }
 
-func (p *peer) Get(key string) (string, int64, bool) {
+func (p *peer) Get(key string) (string, bool) {
 	return p.cc.Get(key)
 }
 

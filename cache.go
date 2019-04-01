@@ -2,7 +2,7 @@ package bcache
 
 import (
 	"sync"
-	//"time"
+	"time"
 
 	"github.com/hashicorp/golang-lru"
 	"github.com/weaveworks/mesh"
@@ -28,12 +28,12 @@ func newCache(maxKeys int) (*cache, error) {
 // value represent cache value
 type value struct {
 	value   string
-	expired int64
-	deleted bool
+	expired int64 // expiration timestamp of the value
+	deleted int64 // deletion timestamp of the value
 }
 
 // Set sets the value of a cache
-func (c *cache) Set(key, val string, expiredTimestamp int64, deleted bool) {
+func (c *cache) Set(key, val string, expiredTimestamp, deleted int64) {
 	c.cc.Add(key, value{
 		value:   val,
 		expired: expiredTimestamp,
@@ -44,14 +44,14 @@ func (c *cache) Set(key, val string, expiredTimestamp int64, deleted bool) {
 
 // Delete del the value of a cache.
 // returns true if the key exists in cache, false otherwise
-func (c *cache) Delete(key string, expiredTimestamp int64) bool {
+func (c *cache) Delete(key string, deleteTimestamp int64) (string, int64, bool) {
 	val, ok := c.get(key)
 	if !ok {
-		return false
+		return "", 0, false
 	}
-	c.Set(key, val.value, expiredTimestamp, true)
+	c.Set(key, val.value, val.expired, deleteTimestamp)
 
-	return true
+	return val.value, val.expired, true
 }
 
 // Get gets cache value of the given key
@@ -65,12 +65,23 @@ func (c *cache) get(key string) (*value, bool) {
 }
 
 // Get gets cache value of the given key
-func (c *cache) Get(key string) (string, int64, bool) {
+func (c *cache) Get(key string) (string, bool) {
 	val, ok := c.get(key)
-	if !ok || val.deleted {
-		return "", 0, false
+	if !ok {
+		return "", false
 	}
-	return val.value, val.expired, true
+
+	now := time.Now().UnixNano()
+
+	if now >= val.expired || (now >= val.deleted && val.deleted > 0) {
+		// delete the key if:
+		// - expired
+		// - deleted
+		c.cc.Remove(key)
+		return "", false
+	}
+
+	return val.value, val.deleted <= 0
 }
 
 func (c *cache) Messages() *message {
@@ -118,8 +129,11 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 	var existingKeys []string
 	for _, e := range msg.Entries {
 		cacheVal, ok := c.get(e.Key)
-		if ok && cacheVal.expired >= e.Expired {
-			// the key already exists and has bigger expiration value
+		if ok && cacheVal.expired >= e.Expired && cacheVal.deleted == e.Deleted {
+			// no changes:
+			// - key already exists
+			// - has bigger expiration value
+			// - has same deleted val
 			existingKeys = append(existingKeys, e.Key)
 			continue
 		}
