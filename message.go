@@ -35,9 +35,13 @@ func newMessage(peerID mesh.PeerName, numEntries int) *message {
 }
 
 func newMessageFromEntries(peerID mesh.PeerName, entries map[string]entry) *message {
+	newEntries := make(map[string]entry, len(entries))
+	for k, v := range entries {
+		newEntries[k] = v
+	}
 	return &message{
 		PeerID:  peerID,
-		Entries: entries,
+		Entries: newEntries,
 	}
 }
 
