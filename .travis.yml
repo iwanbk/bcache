@@ -9,6 +9,9 @@ install:
 script:
   - go build
   - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+  # execute integration test without `-race` flag, as it is not thread safe
+  # caused by issue on https://github.com/weaveworks/mesh/pull/98
   - go test -tags integration -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
