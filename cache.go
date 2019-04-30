@@ -127,17 +127,17 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 	}
 
 	var existingKeys []string
-	for _, e := range msg.Entries {
-		cacheVal, ok := c.get(e.Key)
+	for key, e := range msg.Entries {
+		cacheVal, ok := c.get(key)
 		if ok && cacheVal.expired >= e.Expired && cacheVal.deleted == e.Deleted {
 			// no changes:
 			// - key already exists
 			// - has bigger expiration value
 			// - has same deleted val
-			existingKeys = append(existingKeys, e.Key)
+			existingKeys = append(existingKeys, key)
 			continue
 		}
-		c.Set(e.Key, e.Val, e.Expired, e.Deleted)
+		c.Set(key, e.Val, e.Expired, e.Deleted)
 		changedKey++
 	}
 
@@ -150,12 +150,12 @@ func (c *cache) mergeChange(msg *message) (delta mesh.GossipData, changedKey int
 }
 
 func (c *cache) mergeComplete(msg *message) {
-	for _, ent := range msg.Entries {
-		cacheVal, ok := c.get(ent.Key)
+	for key, ent := range msg.Entries {
+		cacheVal, ok := c.get(key)
 		if !ok || cacheVal.expired < ent.Expired {
 			// if !exist in cache, set it
 			// if val in cache is older, set it
-			c.Set(ent.Key, ent.Val, ent.Expired, ent.Deleted)
+			c.Set(key, ent.Val, ent.Expired, ent.Deleted)
 		}
 	}
 }
