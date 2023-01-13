@@ -4,18 +4,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/weaveworks/mesh"
 )
 
 type cache struct {
 	peerID mesh.PeerName
 	mux    sync.RWMutex
-	cc     *lru.Cache
+	cc     *lru.Cache[string, interface{}]
 }
 
 func newCache(maxKeys int) (*cache, error) {
-	cc, err := lru.New(maxKeys)
+	cc, err := lru.New[string, interface{}](maxKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -88,12 +88,11 @@ func (c *cache) Messages() *message {
 	m := newMessage(c.peerID, c.cc.Len())
 
 	for _, k := range c.cc.Keys() {
-		key := k.(string)
-		cacheVal, ok := c.get(key)
+		cacheVal, ok := c.get(k)
 		if !ok {
 			continue
 		}
-		m.add(key, cacheVal.value, cacheVal.expired, cacheVal.deleted)
+		m.add(k, cacheVal.value, cacheVal.expired, cacheVal.deleted)
 	}
 	return m
 
